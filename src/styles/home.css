@@ -1,10 +1,15 @@
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .08rem .1rem;
+
   .logo {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: #fff;
-    padding: .08rem .1rem;
     display: flex;
     align-items: center;
 
@@ -14,7 +19,7 @@
     }
 
     .text {
-      font-size: .18rem;
+      font-size: .16rem;
       font-weight: bold;
       padding-left: .06rem;
       letter-spacing: 1px;
@@ -24,13 +29,12 @@
 
 .main {
   padding: .16rem;
-  /* width: 100vw; */
 
   .status {
     display: flex;
     justify-content: space-between;
     gap: .1rem;
-    font-size: .18rem;
+    font-size: .14rem;
     padding-top: .16rem;
 
     .status-card {
@@ -57,26 +61,22 @@
   .grid-ul {
     display: grid;
     grid-template-columns: 1fr;
-    /* justify-content: space-between; */
     row-gap: .1rem;
-    column-gap: .05rem;
     padding: .16rem 0px;
-    /* justify-items: center; */
-    /* justify-items: stretch; */
-
-        /* grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); */
-    /* grid-template-columns: unset; */
 
     .card-li {
       background-color: #fff;
       border-radius: .08rem;
-      height: 100px;
+      padding: .15rem;
     }
   }
 }
 
-/* @media (max-width: 768px) {
-  .grid-ul {
-    grid-template-columns: unset;
+@media (min-width: 768px) {
+  .main {
+    .grid-ul {
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      column-gap: .15rem;
+    }
   }
-} */
+}

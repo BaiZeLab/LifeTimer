@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Input } from "antd";
-import { CalendarOutlined, ScheduleOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Input, Progress, ProgressProps, Tag } from "antd";
+import { PlusOutlined, PushpinOutlined, SearchOutlined, TagOutlined } from "@ant-design/icons";
 import '@/styles/home.css'
 
 const Home = () => {
   const [searchkey, setSearchkey] = useState('')
+  const twoColors: ProgressProps['strokeColor'] = {
+    '0%': '#108ee9',
+    '100%': '#87d068',
+  };
 
   const search = (e: React.KeyboardEvent<HTMLInputElement>) => {
     let value = e.currentTarget.value.trim()
@@ -24,6 +28,7 @@ const Home = () => {
           <img src="/favicon.svg" alt="appLogo" />
           <div className="text">Life Timer</div>
         </a>
+        <Button shape="circle" icon={<PlusOutlined />} size="small" />
       </div>
       <div className="main">
         <div>
@@ -40,24 +45,41 @@ const Home = () => {
           </div>
         </div>
         <div className="grid-ul">
-          <div className="card-li">
-            <h2>牛奶</h2>
-            <span>已过期</span>
-            <div>生鲜</div>
-            {/* <div>冰箱</div> */}
-          </div>
-          <div className="card-li">
-            <h2>牛奶</h2>
-            <span>已过期</span>
-            <div>生鲜</div>
-            {/* <div>冰箱</div> */}
-          </div>
-          <div className="card-li">
-            <h2>牛奶</h2>
-            <span>已过期</span>
-            <div>生鲜</div>
-            {/* <div>冰箱</div> */}
-          </div>
+          {
+            [1, 2, 3, 4, 5, 6].map(p => {
+              return (
+                <div className="card-li" key={p}>
+                  <div className="flex justify-between">
+                    <div className="font-[700]">牛奶</div>
+                    {
+                      p % 2 == 0
+                        ?
+                        <div className="text-red-700 text-[.14rem]">已过期</div>
+                        :
+                        <div className="text-[.14rem"><span className="text-[#d89614] pr-[.03rem]">7</span>天</div>
+                    }
+                  </div>
+
+                  <div className="flex gap-[.1rem] py-[.1rem] flex-wrap">
+                    <Tag icon={<TagOutlined />} color="#55acee">
+                      生鲜
+                    </Tag>
+                    <Tag icon={<PushpinOutlined />} color="#3b5999">
+                      冰箱
+                    </Tag>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="text-[.12rem] w-[1.2rem]">2027-02-14</div>
+                    <Progress
+                      percent={99.9}
+                      strokeColor={twoColors}
+                      size="small"
+                    />
+                  </div>
+                </div>
+              )
+            })
+          }
         </div>
       </div>
       <div className="footer"></div>
