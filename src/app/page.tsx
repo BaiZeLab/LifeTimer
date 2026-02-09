@@ -1,15 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Button, Input, Progress, ProgressProps, Tag } from "antd";
+import { Button, Checkbox, DatePicker, DatePickerProps, Form, FormProps, Input, Modal, Progress, ProgressProps, Tag } from "antd";
 import { PlusOutlined, PushpinOutlined, SearchOutlined, TagOutlined } from "@ant-design/icons";
 import '@/styles/home.css'
 
 const Home = () => {
   const [searchkey, setSearchkey] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [form] = Form.useForm();
   const twoColors: ProgressProps['strokeColor'] = {
     '0%': '#108ee9',
     '100%': '#87d068',
+  };
+
+  type FieldType = {
+    name?: string;
+    expirationDate?: string;
+    lable?: string;
+    location?: string;
   };
 
   const search = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -21,6 +30,39 @@ const Home = () => {
     }
   }
 
+  const handleOk = () => {
+    form.validateFields()
+      .then(() => {
+        form.submit()
+        form.resetFields();
+        setIsModalOpen(false);
+      })
+    // .catch(() => {
+    //   alert(500)
+    // })
+  };
+
+  const handleCancel = () => {
+    form.resetFields();
+    setIsModalOpen(false);
+  };
+
+  const onFinish: FormProps<FieldType>['onFinish'] = (values) => {
+    console.log('Success:', values);
+  };
+
+  const onFinishFailed: FormProps<FieldType>['onFinishFailed'] = (errorInfo) => {
+    console.log('Failed:', errorInfo);
+  };
+
+  const onChange: DatePickerProps['onChange'] = (date, dateString) => {
+    console.log(date, dateString);
+  };
+
+  // useEffect(() => {
+  //   setIsModalOpen(true);
+  // }, []);
+
   return (
     <React.Fragment>
       <div className="header">
@@ -28,7 +70,7 @@ const Home = () => {
           <img src="/favicon.svg" alt="appLogo" />
           <div className="text">Life Timer</div>
         </a>
-        <Button shape="circle" icon={<PlusOutlined />} size="small" />
+        <Button shape="circle" icon={<PlusOutlined />} size="small" onClick={() => setIsModalOpen(true)} />
       </div>
       <div className="main">
         <div>
@@ -83,6 +125,56 @@ const Home = () => {
         </div>
       </div>
       <div className="footer"></div>
+      <Modal
+        title="新增"
+        destroyOnHidden={true}
+        maskClosable={false}
+        open={isModalOpen}
+        onOk={handleOk}
+        onCancel={handleCancel}
+      >
+        <Form
+          name="basic"
+          form={form}
+          // labelCol={{ span: 8 }}
+          // wrapperCol={{ span: 16 }}
+          // style={{ maxWidth: 600 }}
+          // initialValues={{ remember: true }}
+          // onFinish={onFinish}
+          // onFinishFailed={onFinishFailed}
+          autoComplete="off"
+        >
+          <Form.Item<FieldType>
+            name="name"
+            rules={[{ required: true }]}
+            help={false}
+          >
+            <Input placeholder="物品" />
+          </Form.Item>
+
+          <Form.Item<FieldType>
+            name="expirationDate"
+            rules={[{ required: true }]}
+            help={false}
+          >
+            <DatePicker onChange={onChange} suffixIcon="" styles={{ "root": { "width": "100%" } }} />
+          </Form.Item>
+          <Form.Item<FieldType>
+            name="lable"
+            rules={[{ required: true }]}
+            help={false}
+          >
+            <Input placeholder="标签" />
+          </Form.Item>
+          <Form.Item<FieldType>
+            name="location"
+            rules={[{ required: true }]}
+            help={false}
+          >
+            <Input placeholder="地点" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </React.Fragment>
   )
 };
