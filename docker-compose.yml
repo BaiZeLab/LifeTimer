@@ -7,7 +7,7 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     ports:
-      - "3100:3100"
+      - "3425:3100"
     volumes:
       - ~/.docker-storage/life-timer/data:/app/data
     restart: unless-stopped
