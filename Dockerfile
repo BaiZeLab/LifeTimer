@@ -3,7 +3,7 @@ FROM node:22-alpine AS base
 # ---- 第 1 阶段：安装依赖 ----
 FROM base AS deps
 # libc6-compat + build tools required for native modules (better-sqlite3)
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
