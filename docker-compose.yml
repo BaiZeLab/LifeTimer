@@ -1,0 +1,18 @@
+services:
+  life-timer:
+    image: life-timer
+    build:
+      context: .
+    container_name: life-timer
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    ports:
+      - "3100:3100"
+    volumes:
+      - ~/.docker-storage/life-timer/data:/app/data
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
+    enable_ipv6: true

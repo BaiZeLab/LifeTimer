@@ -1,41 +1,347 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Life Timer Design Tokens ─────────────────────────────────── */
+:root {
+  /* Warm cream palette — hue 88 (yellow-warm, not cool blue) */
+  --lt-bg:         oklch(94.5% 0.015 88);   /* page background */
+  --lt-surface:    oklch(99.6% 0.003 88);   /* cards */
+  --lt-surface-2:  oklch(96.5% 0.010 120);  /* inset panels, stat boxes */
+
+  /* Text */
+  --lt-ink-1:      oklch(17% 0.040 263);    /* dark navy — headings, active tab */
+  --lt-ink-2:      oklch(34% 0.018 263);    /* body text */
+  --lt-ink-3:      oklch(54% 0.011 263);    /* secondary */
+  --lt-ink-4:      oklch(68% 0.008 263);    /* tertiary, dates */
+
+  /* Status badge & bar colors */
+  --lt-ok:         oklch(85% 0.165 135);    /* lime green */
+  --lt-ok-text:    oklch(20% 0.045 155);
+  --lt-warn:       oklch(80% 0.155 118);    /* yellow-green */
+  --lt-warn-text:  oklch(22% 0.040 135);
+  --lt-danger:     oklch(59% 0.220 27);     /* clear red */
+  --lt-danger-text:#ffffff;
+  --lt-expired:    oklch(59% 0.220 27);
+
+  /* Bar track */
+  --lt-track:      oklch(91% 0.008 120);
+
+  /* Tag */
+  --lt-tag-bg:     oklch(91.5% 0.010 135);
+  --lt-tag-text:   oklch(40% 0.030 160);
+
+  /* Shadows */
+  --lt-card-shadow: 0 2px 12px oklch(17% 0.04 263 / 0.06),
+                    0 1px 3px oklch(17% 0.04 263 / 0.04);
+
+  /* shadcn overrides */
+  --background: var(--lt-bg);
+  --foreground: var(--lt-ink-1);
+  --card: var(--lt-surface);
+  --card-foreground: var(--lt-ink-1);
+  --popover: var(--lt-surface);
+  --popover-foreground: var(--lt-ink-1);
+  --primary: var(--lt-ink-1);
+  --primary-foreground: oklch(99% 0.002 88);
+  --secondary: var(--lt-surface-2);
+  --secondary-foreground: var(--lt-ink-2);
+  --muted: var(--lt-surface-2);
+  --muted-foreground: var(--lt-ink-3);
+  --accent: var(--lt-surface-2);
+  --accent-foreground: var(--lt-ink-2);
+  --destructive: var(--lt-danger);
+  --border: oklch(91% 0.008 120);
+  --input: oklch(88% 0.010 120);
+  --ring: var(--lt-ink-1);
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm:  calc(var(--radius) * 0.6);
+  --radius-md:  var(--radius);
+  --radius-lg:  calc(var(--radius) * 1.6);
+  --radius-xl:  calc(var(--radius) * 2.2);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; }
+}
 
 html {
-  font-size: 100px;
+  font-size: 16px;
   height: 100%;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  font-size: 0.16rem;
-  height: 100%;
-  background: #ebf1f4;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  line-height: 1.5;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--lt-bg);
 }
 
-/* .container {
+/* ─── Tab Bar ───────────────────────────────────────────────────── */
+.lt-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: oklch(90% 0.012 100);
+  border-radius: 9999px;
+  padding: 4px;
+  gap: 0;
+}
+
+.lt-tab {
+  border: none;
+  background: transparent;
+  border-radius: 9999px;
+  padding: 11px 0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms ease-out, color 180ms ease-out;
+  color: var(--lt-ink-3);
+  letter-spacing: -0.01em;
+}
+
+.lt-tab.active {
+  background: var(--lt-ink-1);
+  color: oklch(97% 0.003 88);
+  box-shadow: 0 2px 8px oklch(17% 0.04 263 / 0.20);
+}
+
+/* ─── Search ───────────────────────────────────────────────────── */
+.lt-search-wrap {
+  position: relative;
+}
+
+.lt-search-input {
+  width: 100%;
+  height: 48px;
+  border-radius: 16px;
+  border: none;
+  background: var(--lt-surface);
+  box-shadow: var(--lt-card-shadow);
+  padding: 0 14px 0 44px;
+  font-size: 14px;
+  color: var(--lt-ink-2);
+  outline: none;
+  font-family: inherit;
+}
+
+.lt-search-input::placeholder { color: var(--lt-ink-4); }
+.lt-search-input:focus { box-shadow: 0 0 0 2px var(--lt-ink-1), var(--lt-card-shadow); }
+
+/* ─── Item Card ────────────────────────────────────────────────── */
+.lt-card {
+  background: var(--lt-surface);
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: var(--lt-card-shadow);
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-} */
-
-@media (min-width: 768px) {
-
-  body {
-    font-size: 14px;
-  }
-  /* .container {
-    flex-direction: row;
-    max-width: 720px;
-    margin: 0 auto;
-  } */
+  gap: 14px;
 }
 
-@media (min-width: 1200px) {
+/* ─── Stat Box (consumption) ───────────────────────────────────── */
+.lt-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
 
-  /* .container {
-    max-width: 1140px;
-    margin: 0 auto;
-    font-size: 1.8rem;
-  } */
+.lt-stat-box {
+  background: var(--lt-surface-2);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+/* ─── Cold-start placeholder ───────────────────────────────────── */
+.lt-cold-start {
+  background: var(--lt-surface-2);
+  border-radius: 14px;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--lt-ink-4);
+}
+
+/* ─── Tag chip ──────────────────────────────────────────────────── */
+.lt-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: var(--lt-tag-bg);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--lt-tag-text);
+  white-space: nowrap;
+}
+
+/* ─── Form ──────────────────────────────────────────────────────── */
+.lt-field { display: flex; flex-direction: column; gap: 6px; }
+
+.lt-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lt-ink-2);
+}
+
+.lt-input {
+  height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid oklch(88% 0.010 120);
+  background: var(--lt-surface);
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--lt-ink-1);
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.lt-input:focus {
+  border-color: var(--lt-ink-1);
+  box-shadow: 0 0 0 3px oklch(17% 0.04 263 / 0.10);
+}
+
+.lt-input::placeholder { color: var(--lt-ink-4); }
+
+.lt-textarea {
+  border-radius: 12px;
+  border: 1.5px solid oklch(88% 0.010 120);
+  background: var(--lt-surface);
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--lt-ink-1);
+  width: 100%;
+  outline: none;
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color 150ms ease-out;
+}
+
+.lt-textarea:focus { border-color: var(--lt-ink-1); }
+
+/* ─── Segmented (form type selector) ───────────────────────────── */
+.lt-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: oklch(92% 0.008 120);
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.lt-seg-btn {
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--lt-ink-3);
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.lt-seg-btn.active {
+  background: var(--lt-surface);
+  color: var(--lt-ink-1);
+  box-shadow: 0 1px 4px oklch(17% 0.04 263 / 0.08);
+}
+
+/* ─── Dialog buttons ────────────────────────────────────────────── */
+.lt-btn {
+  height: 46px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms ease-out, filter 120ms ease-out, background 120ms ease-out;
+  font-family: inherit;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.lt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lt-btn-primary {
+  background: var(--lt-ink-1);
+  color: oklch(97% 0.003 88);
+  padding: 0 24px;
+  letter-spacing: -0.01em;
+}
+
+.lt-btn-primary:not(:disabled):hover {
+  filter: brightness(1.15);
+}
+
+.lt-btn-primary:not(:disabled):active {
+  filter: brightness(0.92);
+}
+
+.lt-btn-ghost {
+  background: var(--lt-surface-2);
+  color: var(--lt-ink-2);
+  padding: 0 16px;
+}
+
+.lt-btn-ghost:not(:disabled):hover {
+  background: oklch(89% 0.012 120);
+  color: var(--lt-ink-1);
+}
+
+.lt-btn-ghost:not(:disabled):active {
+  filter: brightness(0.94);
+}
+
+/* Full-width two-column modal footer */
+.lt-modal-footer {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--lt-border);
+}
+
+.lt-modal-footer .lt-btn {
+  width: 100%;
 }
