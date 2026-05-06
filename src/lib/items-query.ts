@@ -1,9 +1,8 @@
-import db from "./db";
+import sql from "./db";
 import { calcDeadlineMetrics, calcConsumptionEstimate } from "./algorithms";
-import { getItemTagNames } from "./tags";
 import type { DeadlineItemDTO, ConsumptionItemDTO, ItemDTO, ConsumptionLog, DeadlineRenewal } from "@/types/api";
 
-// ── Raw row types (SQLite returns 0/1 for booleans, strings for dates) ────────
+// ── Raw row types ──────────────────────────────────────────────────────────
 
 interface ItemRow {
   id: number;
@@ -31,27 +30,58 @@ interface LogRow {
   item_id: number;
   recorded_at: string;
   value: number;
-  is_topup: number;
-  is_anomaly: number;
+  is_topup: boolean;
+  is_anomaly: boolean;
   notes: string | null;
 }
 
-// ── Deadline ──────────────────────────────────────────────────────────────────
+// ── Batch helpers (eliminate N+1) ──────────────────────────────────────────
 
-const DEADLINE_SELECT = `
-  SELECT i.*, d.expire_date, d.start_date, d.alert_days
-  FROM items i
-  JOIN deadline_items d ON d.item_id = i.id
-`;
+async function fetchTagsByItemIds(itemIds: number[]): Promise<Map<number, string[]>> {
+  if (itemIds.length === 0) return new Map();
+  const rows = await sql`
+    SELECT it.item_id, t.name
+    FROM tags t
+    JOIN item_tags it ON it.tag_id = t.id
+    WHERE it.item_id = ANY(${itemIds})
+  ` as { item_id: number; name: string }[];
 
-function mapDeadline(row: DeadlineRow): DeadlineItemDTO {
+  const map = new Map<number, string[]>();
+  for (const r of rows) {
+    const arr = map.get(r.item_id) ?? [];
+    arr.push(r.name);
+    map.set(r.item_id, arr);
+  }
+  return map;
+}
+
+async function fetchLogsByItemIds(itemIds: number[]): Promise<Map<number, LogRow[]>> {
+  if (itemIds.length === 0) return new Map();
+  const rows = await sql`
+    SELECT * FROM consumption_logs
+    WHERE item_id = ANY(${itemIds})
+    ORDER BY item_id, recorded_at ASC
+  ` as LogRow[];
+
+  const map = new Map<number, LogRow[]>();
+  for (const r of rows) {
+    const arr = map.get(r.item_id) ?? [];
+    arr.push(r);
+    map.set(r.item_id, arr);
+  }
+  return map;
+}
+
+// ── Deadline ──────────────────────────────────────────────────────────────
+
+function mapDeadline(row: DeadlineRow, tags: string[]): DeadlineItemDTO {
   const metrics = calcDeadlineMetrics(row.expire_date, row.alert_days, row.start_date);
   return {
     id: row.id,
     type: "deadline",
     name: row.name,
     notes: row.notes,
-    tags: getItemTagNames(row.id),
+    tags,
     expireDate: row.expire_date,
     startDate: row.start_date,
     alertDays: row.alert_days,
@@ -62,32 +92,34 @@ function mapDeadline(row: DeadlineRow): DeadlineItemDTO {
   };
 }
 
-export function getDeadlineItems(archivedOnly = false): DeadlineItemDTO[] {
-  const where = archivedOnly
-    ? "WHERE i.archived_at IS NOT NULL"
-    : "WHERE i.archived_at IS NULL";
-  const rows = db.prepare(`${DEADLINE_SELECT} ${where}`).all() as DeadlineRow[];
-  return rows.map(mapDeadline);
+export async function getDeadlineItems(archivedOnly = false): Promise<DeadlineItemDTO[]> {
+  const rows = await sql`
+    SELECT i.*, d.expire_date, d.start_date, d.alert_days
+    FROM items i
+    JOIN deadline_items d ON d.item_id = i.id
+    WHERE (${archivedOnly} AND i.archived_at IS NOT NULL)
+       OR (NOT ${archivedOnly} AND i.archived_at IS NULL)
+  ` as DeadlineRow[];
+
+  const tagMap = await fetchTagsByItemIds(rows.map((r) => r.id));
+  return rows.map((r) => mapDeadline(r, tagMap.get(r.id) ?? []));
 }
 
-export function getDeadlineItem(id: number): DeadlineItemDTO | null {
-  const row = db.prepare(`${DEADLINE_SELECT} WHERE i.id = ?`).get(id) as DeadlineRow | undefined;
-  return row ? mapDeadline(row) : null;
+export async function getDeadlineItem(id: number): Promise<DeadlineItemDTO | null> {
+  const rows = await sql`
+    SELECT i.*, d.expire_date, d.start_date, d.alert_days
+    FROM items i
+    JOIN deadline_items d ON d.item_id = i.id
+    WHERE i.id = ${id}
+  ` as DeadlineRow[];
+  if (!rows[0]) return null;
+  const tagMap = await fetchTagsByItemIds([id]);
+  return mapDeadline(rows[0], tagMap.get(id) ?? []);
 }
 
-// ── Consumption ───────────────────────────────────────────────────────────────
+// ── Consumption ───────────────────────────────────────────────────────────
 
-const CONSUMPTION_SELECT = `
-  SELECT i.*, c.unit, c.alert_days
-  FROM items i
-  JOIN consumption_items c ON c.item_id = i.id
-`;
-
-function mapConsumption(row: ConsumptionRow): ConsumptionItemDTO {
-  const logs = db
-    .prepare("SELECT * FROM consumption_logs WHERE item_id = ? ORDER BY recorded_at ASC")
-    .all(row.id) as LogRow[];
-
+function mapConsumption(row: ConsumptionRow, tags: string[], logs: LogRow[]): ConsumptionItemDTO {
   const logCount = logs.length;
   const lastLog = logs[logCount - 1] ?? null;
   const lastRecordedAt = lastLog?.recorded_at ?? null;
@@ -103,7 +135,7 @@ function mapConsumption(row: ConsumptionRow): ConsumptionItemDTO {
     type: "consumption",
     name: row.name,
     notes: row.notes,
-    tags: getItemTagNames(row.id),
+    tags,
     unit: row.unit,
     alertDays: row.alert_days,
     logCount,
@@ -121,53 +153,74 @@ function mapConsumption(row: ConsumptionRow): ConsumptionItemDTO {
   };
 }
 
-export function getConsumptionItems(archivedOnly = false): ConsumptionItemDTO[] {
-  const where = archivedOnly
-    ? "WHERE i.archived_at IS NOT NULL"
-    : "WHERE i.archived_at IS NULL";
-  const rows = db.prepare(`${CONSUMPTION_SELECT} ${where}`).all() as ConsumptionRow[];
-  return rows.map(mapConsumption);
+export async function getConsumptionItems(archivedOnly = false): Promise<ConsumptionItemDTO[]> {
+  const rows = await sql`
+    SELECT i.*, c.unit, c.alert_days
+    FROM items i
+    JOIN consumption_items c ON c.item_id = i.id
+    WHERE (${archivedOnly} AND i.archived_at IS NOT NULL)
+       OR (NOT ${archivedOnly} AND i.archived_at IS NULL)
+  ` as ConsumptionRow[];
+
+  const itemIds = rows.map((r) => r.id);
+  const [tagMap, logMap] = await Promise.all([
+    fetchTagsByItemIds(itemIds),
+    fetchLogsByItemIds(itemIds),
+  ]);
+
+  return rows.map((r) => mapConsumption(r, tagMap.get(r.id) ?? [], logMap.get(r.id) ?? []));
 }
 
-export function getConsumptionItem(id: number): ConsumptionItemDTO | null {
-  const row = db.prepare(`${CONSUMPTION_SELECT} WHERE i.id = ?`).get(id) as ConsumptionRow | undefined;
-  return row ? mapConsumption(row) : null;
+export async function getConsumptionItem(id: number): Promise<ConsumptionItemDTO | null> {
+  const rows = await sql`
+    SELECT i.*, c.unit, c.alert_days
+    FROM items i
+    JOIN consumption_items c ON c.item_id = i.id
+    WHERE i.id = ${id}
+  ` as ConsumptionRow[];
+  if (!rows[0]) return null;
+
+  const [tagMap, logMap] = await Promise.all([
+    fetchTagsByItemIds([id]),
+    fetchLogsByItemIds([id]),
+  ]);
+  return mapConsumption(rows[0], tagMap.get(id) ?? [], logMap.get(id) ?? []);
 }
 
-// ── Mixed ─────────────────────────────────────────────────────────────────────
+// ── Mixed ─────────────────────────────────────────────────────────────────
 
-export function getItem(id: number): ItemDTO | null {
-  const meta = db.prepare("SELECT type FROM items WHERE id = ?").get(id) as { type: string } | undefined;
-  if (!meta) return null;
-  return meta.type === "deadline" ? getDeadlineItem(id) : getConsumptionItem(id);
+export async function getItem(id: number): Promise<ItemDTO | null> {
+  const rows = await sql`SELECT type FROM items WHERE id = ${id}` as { type: string }[];
+  if (!rows[0]) return null;
+  return rows[0].type === "deadline" ? getDeadlineItem(id) : getConsumptionItem(id);
 }
 
-// ── Logs ──────────────────────────────────────────────────────────────────────
+// ── Logs ──────────────────────────────────────────────────────────────────
 
-export function getConsumptionLogs(itemId: number): ConsumptionLog[] {
-  const rows = db
-    .prepare("SELECT * FROM consumption_logs WHERE item_id = ? ORDER BY recorded_at DESC")
-    .all(itemId) as LogRow[];
+export async function getConsumptionLogs(itemId: number): Promise<ConsumptionLog[]> {
+  const rows = await sql`
+    SELECT * FROM consumption_logs WHERE item_id = ${itemId} ORDER BY recorded_at DESC
+  ` as LogRow[];
   return rows.map((r) => ({
     id: r.id,
     itemId: r.item_id,
     recordedAt: r.recorded_at,
     value: r.value,
-    isTopup: !!r.is_topup,
-    isAnomaly: !!r.is_anomaly,
+    isTopup: r.is_topup,
+    isAnomaly: r.is_anomaly,
     notes: r.notes,
   }));
 }
 
-// ── Renewals ──────────────────────────────────────────────────────────────────
+// ── Renewals ──────────────────────────────────────────────────────────────
 
-export function getDeadlineRenewals(itemId: number): DeadlineRenewal[] {
-  const rows = db
-    .prepare("SELECT * FROM deadline_renewals WHERE item_id = ? ORDER BY renewed_at DESC")
-    .all(itemId) as {
-      id: number; item_id: number; renewed_at: string;
-      old_expire_date: string; new_expire_date: string; notes: string | null;
-    }[];
+export async function getDeadlineRenewals(itemId: number): Promise<DeadlineRenewal[]> {
+  const rows = await sql`
+    SELECT * FROM deadline_renewals WHERE item_id = ${itemId} ORDER BY renewed_at DESC
+  ` as {
+    id: number; item_id: number; renewed_at: string;
+    old_expire_date: string; new_expire_date: string; notes: string | null;
+  }[];
   return rows.map((r) => ({
     id: r.id, itemId: r.item_id, renewedAt: r.renewed_at,
     oldExpireDate: r.old_expire_date, newExpireDate: r.new_expire_date, notes: r.notes,

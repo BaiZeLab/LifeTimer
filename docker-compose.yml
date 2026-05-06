@@ -8,8 +8,8 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
     ports:
       - "3425:3100"
-    volumes:
-      - ~/.docker-storage/life-timer/data:/app/data
+    env_file:
+      - .env.local
     restart: unless-stopped
 
 networks:

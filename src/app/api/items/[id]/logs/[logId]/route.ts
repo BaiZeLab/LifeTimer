@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { getConsumptionItem } from "@/lib/items-query";
 import type { PatchLogBody } from "@/types/api";
 
@@ -15,49 +15,49 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const numId = Number(id);
   const numLogId = Number(logId);
 
-  const log = db
-    .prepare("SELECT * FROM consumption_logs WHERE id = ? AND item_id = ?")
-    .get(numLogId, numId);
-  if (!log) return jsonError("Not found", 404);
+  const logRows = await sql`
+    SELECT id FROM consumption_logs WHERE id = ${numLogId} AND item_id = ${numId}
+  ` as { id: number }[];
+  if (logRows.length === 0) return jsonError("Not found", 404);
 
   const body: PatchLogBody = await req.json().catch(() => ({}));
 
   if (body.isAnomaly !== undefined) {
-    db.prepare("UPDATE consumption_logs SET is_anomaly = ? WHERE id = ?")
-      .run(body.isAnomaly ? 1 : 0, numLogId);
+    await sql`UPDATE consumption_logs SET is_anomaly = ${body.isAnomaly} WHERE id = ${numLogId}`;
   }
   if (body.notes !== undefined) {
-    db.prepare("UPDATE consumption_logs SET notes = ? WHERE id = ?")
-      .run(body.notes, numLogId);
+    await sql`UPDATE consumption_logs SET notes = ${body.notes} WHERE id = ${numLogId}`;
   }
   if (body.value !== undefined) {
-    db.prepare("UPDATE consumption_logs SET value = ? WHERE id = ?")
-      .run(body.value, numLogId);
-    db.prepare("UPDATE items SET updated_at = datetime('now') WHERE id = ?").run(numId);
+    await sql`UPDATE consumption_logs SET value = ${body.value} WHERE id = ${numLogId}`;
+    await sql`UPDATE items SET updated_at = ${new Date().toISOString()} WHERE id = ${numId}`;
   }
 
-  const updated = db.prepare("SELECT * FROM consumption_logs WHERE id = ?").get(numLogId) as {
+  const [updated] = await sql`SELECT * FROM consumption_logs WHERE id = ${numLogId}` as {
     id: number; item_id: number; recorded_at: string; value: number;
-    is_topup: number; is_anomaly: number; notes: string | null;
-  };
+    is_topup: boolean; is_anomaly: boolean; notes: string | null;
+  }[];
 
   return NextResponse.json({
     log: {
       id: updated.id, itemId: updated.item_id, recordedAt: updated.recorded_at,
-      value: updated.value, isTopup: !!updated.is_topup, isAnomaly: !!updated.is_anomaly, notes: updated.notes,
+      value: updated.value, isTopup: updated.is_topup, isAnomaly: updated.is_anomaly, notes: updated.notes,
     },
-    item: getConsumptionItem(numId),
+    item: await getConsumptionItem(numId),
   });
 }
 
 // DELETE /api/items/[id]/logs/[logId]
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id, logId } = await params;
-  const result = db
-    .prepare("DELETE FROM consumption_logs WHERE id = ? AND item_id = ?")
-    .run(Number(logId), Number(id));
-  if (result.changes === 0) return jsonError("Not found", 404);
+  const numId = Number(id);
+  const numLogId = Number(logId);
 
-  db.prepare("UPDATE items SET updated_at = datetime('now') WHERE id = ?").run(Number(id));
-  return NextResponse.json({ item: getConsumptionItem(Number(id)) });
+  const rows = await sql`
+    DELETE FROM consumption_logs WHERE id = ${numLogId} AND item_id = ${numId} RETURNING id
+  ` as { id: number }[];
+  if (rows.length === 0) return jsonError("Not found", 404);
+
+  await sql`UPDATE items SET updated_at = ${new Date().toISOString()} WHERE id = ${numId}`;
+  return NextResponse.json({ item: await getConsumptionItem(numId) });
 }

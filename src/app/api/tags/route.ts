@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 
 function jsonError(msg: string, status: number) {
   return NextResponse.json({ error: msg }, { status });
 }
 
 // GET /api/tags
-export function GET() {
-  const tags = db.prepare("SELECT * FROM tags ORDER BY name ASC").all();
+export async function GET() {
+  const tags = await sql`SELECT * FROM tags ORDER BY name ASC`;
   return NextResponse.json(tags);
 }
 
@@ -17,12 +17,10 @@ export async function POST(req: NextRequest) {
   if (!body.name?.trim()) return jsonError("name is required", 400);
 
   try {
-    const result = db
-      .prepare("INSERT INTO tags (name, color) VALUES (?, ?)")
-      .run(body.name.trim(), body.color ?? "#6B7280");
-    const tag = db
-      .prepare("SELECT * FROM tags WHERE id = ?")
-      .get(result.lastInsertRowid);
+    const [tag] = await sql`
+      INSERT INTO tags (name, color) VALUES (${body.name.trim()}, ${body.color ?? "#6B7280"})
+      RETURNING *
+    `;
     return NextResponse.json(tag, { status: 201 });
   } catch {
     return jsonError("Tag already exists", 409);

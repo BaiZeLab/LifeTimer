@@ -2,8 +2,6 @@ FROM node:22-alpine AS base
 
 # ---- 第 1 阶段：安装依赖 ----
 FROM base AS deps
-# libc6-compat + build tools required for native modules (better-sqlite3)
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -31,8 +29,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/start.js ./
-
-RUN mkdir -p /app/data
 
 EXPOSE 3100
 CMD ["node", "start.js"]

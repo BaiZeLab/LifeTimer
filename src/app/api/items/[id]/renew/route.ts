@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import sql from "@/lib/db";
 import { getDeadlineItem } from "@/lib/items-query";
 import type { RenewBody } from "@/types/api";
 
@@ -14,32 +14,29 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const numId = Number(id);
 
-  const deadline = db
-    .prepare("SELECT * FROM deadline_items WHERE item_id = ?")
-    .get(numId) as { expire_date: string; start_date: string | null } | undefined;
+  const rows = await sql`SELECT expire_date, start_date FROM deadline_items WHERE item_id = ${numId}` as {
+    expire_date: string; start_date: string | null;
+  }[];
+  const deadline = rows[0];
   if (!deadline) return jsonError("Not found or not a deadline item", 404);
 
   const body: RenewBody = await req.json().catch(() => null);
   if (!body?.newExpireDate) return jsonError("newExpireDate is required", 400);
 
-  // New period start: caller's choice → old expire_date → today
   const newStartDate = body.newStartDate ?? deadline.expire_date;
+  const now = new Date().toISOString();
 
-  const renew = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO deadline_renewals (item_id, old_expire_date, new_expire_date, notes)
-       VALUES (?, ?, ?, ?)`
-    ).run(numId, deadline.expire_date, body.newExpireDate, body.notes ?? null);
+  await sql.transaction((txSql) => [
+    txSql`
+      INSERT INTO deadline_renewals (item_id, old_expire_date, new_expire_date, notes)
+      VALUES (${numId}, ${deadline.expire_date}, ${body.newExpireDate}, ${body.notes ?? null})
+    `,
+    txSql`
+      UPDATE deadline_items SET expire_date = ${body.newExpireDate}, start_date = ${newStartDate}
+      WHERE item_id = ${numId}
+    `,
+    txSql`UPDATE items SET updated_at = ${now} WHERE id = ${numId}`,
+  ]);
 
-    db.prepare(
-      "UPDATE deadline_items SET expire_date = ?, start_date = ? WHERE item_id = ?"
-    ).run(body.newExpireDate, newStartDate, numId);
-
-    db.prepare(
-      "UPDATE items SET updated_at = datetime('now') WHERE id = ?"
-    ).run(numId);
-  });
-
-  renew();
-  return NextResponse.json(getDeadlineItem(numId));
+  return NextResponse.json(await getDeadlineItem(numId));
 }

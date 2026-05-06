@@ -3,8 +3,8 @@ import type { ItemStatus } from "@/types/api";
 export interface LogRow {
   recorded_at: string;
   value: number;
-  is_topup: number;
-  is_anomaly: number;
+  is_topup: boolean | number;
+  is_anomaly: boolean | number;
 }
 
 export interface ConsumptionEstimate {

@@ -13,8 +13,8 @@
 | 组件库 | [Ant Design](https://ant.design) → 规划迁移 [shadcn/ui](https://ui.shadcn.com) | 6.x |
 | 样式 | [Tailwind CSS](https://tailwindcss.com) | v4 |
 | 语言 | TypeScript | 5.x |
-| 数据库 | SQLite（本地）→ 后期可迁移 Turso（云端 SQLite） | — |
-| 部署 | Docker + Volume 挂载本地数据 | — |
+| 数据库 | [Neon](https://neon.tech) Serverless PostgreSQL（云端） | — |
+| 部署 | Docker + 环境变量注入数据库连接串 | — |
 | 编译优化 | React Compiler（自动 memoization） | — |
 
 ---
@@ -30,7 +30,7 @@ src/
 │   └── globals.css
 ├── components/             # 可复用组件
 ├── lib/
-│   ├── db.ts               # SQLite 连接
+│   ├── db.ts               # Neon 数据库连接
 │   └── algorithms.ts       # 消耗速率算法
 └── styles/
 ```
@@ -40,7 +40,13 @@ src/
 ## 本地开发
 
 ```bash
+# 1. 安装依赖
 npm install
+
+# 2. 配置数据库连接（复制后填入你的 Neon 连接串）
+cp .env.local.example .env.local   # 或手动创建 .env.local
+
+# 3. 启动开发服务器
 npm run dev
 ```
 
@@ -48,11 +54,19 @@ npm run dev
 
 ---
 
+## 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `DATABASE_URL` | Neon PostgreSQL 连接串（`postgresql://...`） |
+
+---
+
 ## 部署
 
 ```bash
-docker build -t life-timer .
-docker run -d -p 3000:3000 -v /your/local/path:/app/data life-timer
+# 构建并启动（DATABASE_URL 通过 .env.local 注入）
+docker compose up --build -d
 ```
 
 ---
@@ -200,7 +214,7 @@ consumption_logs (
 
 - **时区**：日期存 UTC，展示按客户端本地时区转换
 - **告警触发时机**：用户打开页面时实时计算（后期扩展为定时推送）
-- **扩展口**：API Routes 设计保持与数据库无关，便于后期从 SQLite 迁移至 Turso
+- **扩展口**：API Routes 设计保持与数据库无关，底层使用 `@neondatabase/serverless` HTTP 驱动
 
 ---
 
