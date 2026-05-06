@@ -11,6 +11,18 @@ import {
 } from "@/components/ui/dialog";
 import type { DeadlineItemDTO, ConsumptionItemDTO, DeadlineRenewal, ConsumptionLog, ItemStatus } from "@/types/api";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtDate(dateStr: string): string {
+  const d = new Date(dateStr.slice(0, 10) + "T00:00:00");
+  const thisYear = new Date().getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return d.getFullYear() === thisYear
+    ? `${m}月${day}日`
+    : `${d.getFullYear()}年${m}月${day}日`;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab = "deadline" | "consumption";
@@ -63,8 +75,8 @@ function DayBadge({ daysLeft, status }: { daysLeft: number; status: ItemStatus }
           <span style={{ fontSize: "34px", fontWeight: 800, color: cfg.numColor, lineHeight: 1, letterSpacing: "-0.02em" }}>
             {daysLeft}
           </span>
-          <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em", color: cfg.labelColor, textTransform: "uppercase" }}>
-            days
+          <span style={{ fontSize: "10px", fontWeight: 700, color: cfg.labelColor }}>
+            天
           </span>
         </>
       )}
@@ -119,13 +131,28 @@ function Tags({ tags, onTagClick }: { tags: string[]; onTagClick?: (tag: string)
 
 // ── CardActions ───────────────────────────────────────────────────────────────
 
-function CardActions({ children }: { children: React.ReactNode }) {
+function CardActions({ children, visible }: { children: React.ReactNode; visible?: boolean }) {
   return (
-    <div style={{
-      display: "flex", gap: "4px", justifyContent: "flex-end",
-      borderTop: "1px solid var(--lt-track)", paddingTop: "12px", marginTop: "2px",
-    }}>
-      {children}
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+      display: "grid",
+      gridTemplateRows: visible ? "1fr" : "0fr",
+      marginTop: visible ? "2px" : "-14px",
+      transition: "grid-template-rows 180ms ease-out, margin-top 180ms ease-out",
+      }}
+    >
+      <div style={{ overflow: "hidden" }}>
+        <div style={{
+          display: "flex", gap: "4px", justifyContent: "flex-end",
+          borderTop: "1px solid var(--lt-track)", paddingTop: "12px",
+          paddingBottom: "2px",
+          opacity: visible ? 1 : 0,
+          transition: "opacity 120ms ease-out 60ms",
+        }}>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
@@ -164,10 +191,13 @@ function ActionBtn({
 
 function HistoryPanel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      background: "var(--lt-surface-2)", borderRadius: "12px",
-      padding: "12px 14px", display: "flex", flexDirection: "column", gap: "8px",
-    }}>
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        background: "var(--lt-surface-2)", borderRadius: "12px",
+        padding: "12px 14px", display: "flex", flexDirection: "column", gap: "8px",
+      }}
+    >
       {children}
     </div>
   );
@@ -188,6 +218,10 @@ function DeadlineCard({
   const [expanded, setExpanded] = useState(false);
   const [renewals, setRenewals] = useState<DeadlineRenewal[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+
+  const actionsVisible = hovered || pinned || expanded;
 
   const overdueDays = item.daysLeft < 0 ? Math.abs(item.daysLeft) : 0;
 
@@ -205,7 +239,13 @@ function DeadlineCard({
   };
 
   return (
-    <div className="lt-card">
+    <div
+      className="lt-card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setPinned((v) => !v)}
+      style={{ cursor: "default" }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, minWidth: 0 }}>
           <Tags tags={item.tags} onTagClick={onTagClick} />
@@ -213,7 +253,7 @@ function DeadlineCard({
             {item.name}
           </div>
           <div style={{ fontSize: "13px", color: "var(--lt-ink-4)" }}>
-            {item.expireDate} 到期
+            {fmtDate(item.expireDate)} 到期
             {overdueDays > 0 && (
               <span style={{ marginLeft: "6px", color: "var(--lt-danger)", fontWeight: 600 }}>
                 · 已过期 {overdueDays} 天
@@ -244,19 +284,19 @@ function DeadlineCard({
             }}>
               <div>
                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--lt-ink-2)" }}>
-                  {r.oldExpireDate} → {r.newExpireDate}
+                  {fmtDate(r.oldExpireDate)} → {fmtDate(r.newExpireDate)}
                 </div>
                 {r.notes && <div style={{ fontSize: "12px", color: "var(--lt-ink-4)", marginTop: "2px" }}>{r.notes}</div>}
               </div>
               <div style={{ fontSize: "11px", color: "var(--lt-ink-4)", flexShrink: 0, marginLeft: "12px" }}>
-                {r.renewedAt.slice(0, 10)}
+                {fmtDate(r.renewedAt)}
               </div>
             </div>
           ))}
         </HistoryPanel>
       )}
 
-      <CardActions>
+      <CardActions visible={actionsVisible}>
         <ActionBtn
           icon={expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           label={`续期记录${renewals.length > 0 ? ` (${renewals.length})` : ""}`}
@@ -441,6 +481,12 @@ function ConsumptionCard({
     setExpanded((v) => !v);
   };
 
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [logDeleteTarget, setLogDeleteTarget] = useState<number | null>(null);
+
+  const actionsVisible = hovered || pinned || expanded;
+
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [editLogValue, setEditLogValue] = useState("");
   const [editLogNotes, setEditLogNotes] = useState("");
@@ -482,13 +528,20 @@ function ConsumptionCard({
 
   const deleteLog = async (logId: number) => {
     await fetch(`/api/items/${item.id}/logs/${logId}`, { method: "DELETE" });
+    setLogDeleteTarget(null);
     await loadLogs();
   };
 
   const [showChart, setShowChart] = useState(false);
 
   return (
-    <div className="lt-card">
+    <div
+      className="lt-card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setPinned((v) => !v)}
+      style={{ cursor: "default" }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, minWidth: 0 }}>
           <Tags tags={item.tags} onTagClick={onTagClick} />
@@ -522,7 +575,7 @@ function ConsumptionCard({
             </span>
             <span style={{ fontSize: "13px", color: "var(--lt-ink-3)" }}>{item.unit}</span>
             <span style={{ fontSize: "12px", color: "var(--lt-ink-4)", marginLeft: "6px" }}>
-              {item.lastRecordedAt ? `录入于 ${item.lastRecordedAt.slice(0, 10)}` : ""}
+              {item.lastRecordedAt ? `录入于 ${fmtDate(item.lastRecordedAt)}` : ""}
             </span>
           </div>
         </div>
@@ -654,7 +707,7 @@ function ConsumptionCard({
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0, marginLeft: "8px" }}>
                     <div style={{ fontSize: "11px", color: "var(--lt-ink-4)" }}>
-                      {log.recordedAt.slice(0, 10)}
+                      {fmtDate(log.recordedAt)}
                     </div>
                     <button
                       title="编辑"
@@ -681,7 +734,7 @@ function ConsumptionCard({
                     </button>
                     <button
                       title="删除此条记录"
-                      onClick={() => deleteLog(log.id)}
+                      onClick={() => setLogDeleteTarget(log.id)}
                       style={{
                         padding: "3px", borderRadius: "6px", border: "none",
                         background: "transparent", color: "var(--lt-ink-4)",
@@ -698,7 +751,7 @@ function ConsumptionCard({
         </HistoryPanel>
       )}
 
-      <CardActions>
+      <CardActions visible={actionsVisible}>
         <ActionBtn
           icon={expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           label={`历史记录${item.logCount > 0 ? ` (${item.logCount})` : ""}`}
@@ -710,6 +763,12 @@ function ConsumptionCard({
         <ActionBtn icon={<Archive size={12} />} label="归档" onClick={() => onArchive(item.id)} />
         <ActionBtn icon={<Trash2 size={12} />} label="删除" onClick={() => onDelete(item.id)} danger />
       </CardActions>
+
+      <DeleteConfirmModal
+        target={logDeleteTarget !== null ? { id: logDeleteTarget, name: "该条示数记录" } : null}
+        onClose={() => setLogDeleteTarget(null)}
+        onConfirm={deleteLog}
+      />
     </div>
   );
 }

@@ -11,7 +11,15 @@ type AnyItem = DeadlineItemDTO | ConsumptionItemDTO;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(d: string) { return d.slice(0, 10); }
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr.slice(0, 10) + "T00:00:00");
+  const thisYear = new Date().getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return d.getFullYear() === thisYear
+    ? `${m}月${day}日`
+    : `${d.getFullYear()}年${m}月${day}日`;
+}
 
 // ── DeleteConfirmModal (inline copy) ─────────────────────────────────────────
 
@@ -70,15 +78,24 @@ function ArchivedCard({
   onRestore: (id: number) => void;
   onDelete: (id: number, name: string) => void;
 }) {
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const actionsVisible = hovered || pinned;
+
   const subtitle = item.type === "deadline"
-    ? `到期 ${(item as DeadlineItemDTO).expireDate}`
+    ? `到期 ${formatDate((item as DeadlineItemDTO).expireDate)}`
     : `${(item as ConsumptionItemDTO).unit} · ${(item as ConsumptionItemDTO).logCount} 条记录`;
 
   return (
-    <div style={{
-      background: "var(--lt-surface)", borderRadius: "18px", padding: "16px 18px",
-      boxShadow: "var(--lt-card-shadow)", opacity: 0.75,
-    }}>
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setPinned((v) => !v)}
+      style={{
+        background: "var(--lt-surface)", borderRadius: "18px", padding: "16px 18px",
+        boxShadow: "var(--lt-card-shadow)", opacity: 0.75, cursor: "default",
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* tags */}
@@ -108,9 +125,22 @@ function ArchivedCard({
       </div>
 
       {/* Actions */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "grid",
+          gridTemplateRows: actionsVisible ? "1fr" : "0fr",
+          marginTop: actionsVisible ? "12px" : "0",
+          transition: "grid-template-rows 180ms ease-out, margin-top 180ms ease-out",
+        }}
+      >
+      <div style={{ overflow: "hidden" }}>
       <div style={{
         display: "flex", gap: "6px", justifyContent: "flex-end",
-        borderTop: "1px solid var(--lt-track)", paddingTop: "10px", marginTop: "12px",
+        borderTop: "1px solid var(--lt-track)", paddingTop: "10px",
+        paddingBottom: "2px",
+        opacity: actionsVisible ? 1 : 0,
+        transition: "opacity 120ms ease-out 60ms",
       }}>
         <button onClick={() => onRestore(item.id)} style={{
           display: "flex", alignItems: "center", gap: "5px",
@@ -128,6 +158,8 @@ function ArchivedCard({
         }}>
           <Trash2 size={12} />彻底删除
         </button>
+      </div>
+      </div>
       </div>
     </div>
   );

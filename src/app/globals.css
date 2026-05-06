@@ -124,7 +124,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background 180ms ease-out, color 180ms ease-out;
-  color: var(--lt-ink-3);
+  color: var(--lt-ink-2);
   letter-spacing: -0.01em;
 }
 
@@ -165,6 +165,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  cursor: pointer;
+  transition: box-shadow 160ms ease-out, transform 160ms ease-out;
+}
+
+.lt-card:hover {
+  box-shadow: 0 6px 24px oklch(17% 0.04 263 / 0.10),
+              0 2px 6px  oklch(17% 0.04 263 / 0.06);
+  transform: translateY(-1px);
 }
 
 /* ─── Stat Box (consumption) ───────────────────────────────────── */
