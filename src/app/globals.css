@@ -147,7 +147,7 @@ body {
   background: var(--lt-surface);
   box-shadow: var(--lt-card-shadow);
   padding: 0 14px 0 44px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--lt-ink-2);
   outline: none;
   font-family: inherit;
@@ -228,7 +228,7 @@ body {
   border: 1.5px solid oklch(88% 0.010 120);
   background: var(--lt-surface);
   padding: 0 14px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--lt-ink-1);
   width: 100%;
   outline: none;
@@ -248,7 +248,7 @@ body {
   border: 1.5px solid oklch(88% 0.010 120);
   background: var(--lt-surface);
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--lt-ink-1);
   width: 100%;
   outline: none;
