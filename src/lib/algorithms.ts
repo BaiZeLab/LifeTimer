@@ -19,12 +19,26 @@ export interface ConsumptionEstimate {
  * Calculate weighted average daily consumption rate and derived metrics.
  *
  * Algorithm:
- * 1. Split logs into segments by topup events.
- * 2. Each segment rate = (start_value - end_value) / days.
- * 3. Weighted average with exponential decay (recent segments weighted higher).
+ * 1. Sort and filter anomaly logs.
+ * 2. For each consecutive pair of logs, compute the interval consumption rate.
+ *    Pairs that cross a topup (value increases) are skipped.
+ * 3. Weight each interval by two factors multiplied together:
+ *    - Time decay: exp(-λ × days_since_interval_end), half-life = RATE_HALF_LIFE_DAYS.
+ *      More recent intervals matter more.
+ *    - Interval length: min(interval_days, MAX_INTERVAL_WEIGHT_DAYS).
+ *      Longer intervals are more statistically reliable; single-day spikes
+ *      are naturally down-weighted compared to multi-day intervals.
  * 4. Project current estimated value from last log.
  * 5. Estimate days remaining.
  */
+
+/** Half-life for time-decay weighting (days). Data ~4 weeks old has half the influence. */
+const RATE_HALF_LIFE_DAYS = 28;
+const RATE_LAMBDA = Math.LN2 / RATE_HALF_LIFE_DAYS;
+
+/** Cap on interval-length weight to prevent a single long gap from dominating. */
+const MAX_INTERVAL_WEIGHT_DAYS = 7;
+
 export function calcConsumptionEstimate(
   logs: LogRow[],
   alertDays: number
@@ -35,62 +49,52 @@ export function calcConsumptionEstimate(
 
   if (logs.length < 2) return empty;
 
-  // Filter anomalies out for rate calculation, but keep for value projection
-  const validLogs = [...logs].filter((l) => !l.is_anomaly).sort(
-    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-  );
+  // Filter anomalies for rate calculation; keep all logs for value projection
+  const validLogs = [...logs]
+    .filter((l) => !l.is_anomaly)
+    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
 
   if (validLogs.length < 2) return empty;
 
-  // Split into segments: a new segment starts after a topup
-  interface Segment {
-    startValue: number;
-    endValue: number;
-    days: number;
-  }
-  const segments: Segment[] = [];
-  let segStart = validLogs[0];
-
-  for (let i = 1; i < validLogs.length; i++) {
-    const cur = validLogs[i];
-    if (cur.is_topup) {
-      // Previous segment ends at the point just before topup
-      const prev = validLogs[i - 1];
-      const days = daysBetween(segStart.recorded_at, prev.recorded_at);
-      if (days > 0 && segStart.value > prev.value) {
-        segments.push({ startValue: segStart.value, endValue: prev.value, days });
-      }
-      segStart = cur;
-    }
-  }
-  // Last (current) segment
-  const last = validLogs[validLogs.length - 1];
-  const lastDays = daysBetween(segStart.recorded_at, last.recorded_at);
-  if (lastDays > 0 && segStart.value > last.value) {
-    segments.push({ startValue: segStart.value, endValue: last.value, days: lastDays });
-  }
-
-  if (segments.length === 0) return empty;
-
-  // Weighted average (exponential decay: newest segment has weight 1, each older halved)
+  const now = Date.now();
   let weightedRateSum = 0;
   let weightSum = 0;
-  segments.forEach((seg, i) => {
-    const rate = (seg.startValue - seg.endValue) / seg.days;
-    const weight = Math.pow(2, i);  // newer = higher index = higher weight
+
+  for (let i = 0; i < validLogs.length - 1; i++) {
+    const a = validLogs[i];
+    const b = validLogs[i + 1];
+
+    // A topup causes value to rise — skip this pair (it's not a consumption interval)
+    if (b.is_topup || b.value >= a.value) continue;
+
+    const intervalDays = (new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()) / 86_400_000;
+    if (intervalDays <= 0) continue;
+
+    const rate = (a.value - b.value) / intervalDays;
+
+    // Time decay: intervals that ended more recently carry more weight
+    const daysAgo = (now - new Date(b.recorded_at).getTime()) / 86_400_000;
+    const timeWeight = Math.exp(-RATE_LAMBDA * daysAgo);
+
+    // Length weight: longer intervals are more reliable; cap to avoid dominance
+    const lengthWeight = Math.min(intervalDays, MAX_INTERVAL_WEIGHT_DAYS);
+
+    const weight = timeWeight * lengthWeight;
     weightedRateSum += rate * weight;
     weightSum += weight;
-  });
-  const dailyRate = weightSum > 0 ? weightedRateSum / weightSum : 0;
+  }
 
+  if (weightSum === 0) return empty;
+
+  const dailyRate = weightedRateSum / weightSum;
   if (dailyRate <= 0) return empty;
 
-  // Project from last log
-  const allLogs = [...logs].sort(
+  // Project from the most recent log (including anomaly logs for current value)
+  const allSorted = [...logs].sort(
     (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
   );
-  const lastLog = allLogs[allLogs.length - 1];
-  const daysSinceLast = daysBetween(lastLog.recorded_at, new Date().toISOString());
+  const lastLog = allSorted[allSorted.length - 1];
+  const daysSinceLast = (now - new Date(lastLog.recorded_at).getTime()) / 86_400_000;
   const estimatedValue = Math.max(0, lastLog.value - daysSinceLast * dailyRate);
   const estimatedDays = Math.floor(estimatedValue / dailyRate);
 
