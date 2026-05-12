@@ -6,36 +6,52 @@
 
 /* ─── Life Timer Design Tokens ─────────────────────────────────── */
 :root {
-  /* Warm cream palette — hue 88 (yellow-warm, not cool blue) */
-  --lt-bg:         oklch(94.5% 0.015 88);   /* page background */
-  --lt-surface:    oklch(99.6% 0.003 88);   /* cards */
-  --lt-surface-2:  oklch(96.5% 0.010 120);  /* inset panels, stat boxes */
+  /* Warm cream palette */
+  --lt-bg:         oklch(94.5% 0.015 88);
+  --lt-surface:    oklch(99.0% 0.008 88);  /* slightly warmer than pure white */
+  --lt-surface-2:  oklch(96.5% 0.010 88);
+  --lt-surface-hover: oklch(97.5% 0.012 88); /* warm hover tint, à la Notion */
 
-  /* Text */
-  --lt-ink-1:      oklch(17% 0.040 263);    /* dark navy — headings, active tab */
-  --lt-ink-2:      oklch(34% 0.018 263);    /* body text */
-  --lt-ink-3:      oklch(54% 0.011 263);    /* secondary */
-  --lt-ink-4:      oklch(68% 0.008 263);    /* tertiary, dates */
+  /* Text — warm neutral (hue 75) reduces blue-gray coldness against cream bg */
+  --lt-ink-1:      oklch(17% 0.032 75);
+  --lt-ink-2:      oklch(33% 0.018 75);
+  --lt-ink-3:      oklch(53% 0.013 80);
+  --lt-ink-4:      oklch(52% 0.010 80);   /* ~4.8:1 on surface, WCAG AA */
 
-  /* Status badge & bar colors */
-  --lt-ok:         oklch(85% 0.165 135);    /* lime green */
-  --lt-ok-text:    oklch(20% 0.045 155);
-  --lt-warn:       oklch(80% 0.155 118);    /* yellow-green */
-  --lt-warn-text:  oklch(22% 0.040 135);
-  --lt-danger:     oklch(59% 0.220 27);     /* clear red */
-  --lt-danger-text:#ffffff;
-  --lt-expired:    oklch(59% 0.220 27);
+  /* Status colors */
+  --lt-ok:         oklch(78% 0.165 135);
+  --lt-warn:       oklch(67% 0.185 65);
+  --lt-danger:     oklch(59% 0.220 27);
+  --lt-expired-color: oklch(54% 0.014 80);   /* warm muted, distinct from danger */
 
-  /* Bar track */
-  --lt-track:      oklch(91% 0.008 120);
+  /* Bar track — warm cream neutral */
+  --lt-track:      oklch(91% 0.010 88);
 
-  /* Tag */
-  --lt-tag-bg:     oklch(91.5% 0.010 135);
-  --lt-tag-text:   oklch(40% 0.030 160);
+  /* Tags — warm amber tint for clear contrast against cream bg */
+  --lt-tag-bg:     oklch(91.5% 0.016 80);
+  --lt-tag-text:   oklch(40% 0.030 70);
 
-  /* Shadows */
-  --lt-card-shadow: 0 2px 12px oklch(17% 0.04 263 / 0.06),
-                    0 1px 3px oklch(17% 0.04 263 / 0.04);
+  /* Borders — warm, not cool-green */
+  --lt-border-muted: oklch(91% 0.010 88);
+  --lt-border:       oklch(87% 0.012 88);
+
+  /* Accent (for focus rings) */
+  --lt-accent:     var(--lt-ink-1);
+
+  /* Shadows — warm-tinted, matching warm ink-1 hue */
+  --lt-card-shadow: 0 2px 12px oklch(17% 0.032 75 / 0.07),
+                    0 1px 3px  oklch(17% 0.032 75 / 0.05);
+
+  /* Text on var(--lt-ink-1) background */
+  --lt-on-ink:     oklch(97% 0.005 88);
+
+  /* FAB — warm dark, matches ink-1 */
+  --lt-fab-bg:    oklch(18% 0.032 75);
+  --lt-fab-color: oklch(97% 0.005 88);
+
+  /* Skeleton shimmer — warm cream tones */
+  --lt-skel-base:  oklch(93.5% 0.010 88);
+  --lt-skel-shine: oklch(97.8% 0.006 88);
 
   /* shadcn overrides */
   --background: var(--lt-bg);
@@ -53,10 +69,54 @@
   --accent: var(--lt-surface-2);
   --accent-foreground: var(--lt-ink-2);
   --destructive: var(--lt-danger);
-  --border: oklch(91% 0.008 120);
-  --input: oklch(88% 0.010 120);
+  --border: var(--lt-border);
+  --input: oklch(87% 0.012 88);
   --ring: var(--lt-ink-1);
   --radius: 0.75rem;
+}
+
+/* ─── Dark Mode ─────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lt-bg:         oklch(13.5% 0.014 263);
+    --lt-surface:    oklch(20%   0.016 263);
+    --lt-surface-2:  oklch(27%   0.013 263);
+    --lt-surface-hover: oklch(24% 0.015 263);
+
+    --lt-ink-1:      oklch(95%   0.005 88);
+    --lt-ink-2:      oklch(80%   0.008 88);
+    --lt-ink-3:      oklch(62%   0.010 88);
+    --lt-ink-4:      oklch(63%   0.008 88);  /* ~4.5:1 on dark bg, WCAG AA */
+
+    --lt-track:      oklch(33%   0.012 263);
+    --lt-tag-bg:     oklch(28%   0.025 155);
+    --lt-tag-text:   oklch(72%   0.040 155);
+    --lt-border-muted: oklch(33% 0.010 263);
+    --lt-border:     oklch(36%   0.010 263);
+    --lt-expired-color: oklch(62% 0.012 263);
+
+    --lt-card-shadow: 0 2px 12px oklch(5% 0.02 263 / 0.50),
+                      0 1px 3px  oklch(5% 0.02 263 / 0.35);
+
+    --lt-on-ink:     oklch(18%   0.035 263);
+
+    --lt-fab-bg:    oklch(86%   0.008 88);
+    --lt-fab-color: oklch(18%   0.038 263);
+
+    --lt-skel-base:  oklch(23%   0.012 263);
+    --lt-skel-shine: oklch(29%   0.010 263);
+
+    --background: var(--lt-bg);
+    --foreground: var(--lt-ink-1);
+    --card: var(--lt-surface);
+    --card-foreground: var(--lt-ink-1);
+    --popover: var(--lt-surface);
+    --popover-foreground: var(--lt-ink-1);
+    --secondary: var(--lt-surface-2);
+    --muted: var(--lt-surface-2);
+    --border: var(--lt-border);
+    --input: oklch(30% 0.012 263);
+  }
 }
 
 @theme inline {
@@ -109,10 +169,13 @@ body {
 .lt-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: oklch(90% 0.012 100);
+  background: oklch(91% 0.012 88);
   border-radius: 9999px;
   padding: 4px;
-  gap: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lt-tabs { background: oklch(28% 0.013 80); }
 }
 
 .lt-tab {
@@ -124,20 +187,22 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background 180ms ease-out, color 180ms ease-out;
-  color: var(--lt-ink-2);
+  color: var(--lt-ink-3);
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
 }
 
 .lt-tab.active {
   background: var(--lt-ink-1);
-  color: oklch(97% 0.003 88);
-  box-shadow: 0 2px 8px oklch(17% 0.04 263 / 0.20);
+  color: var(--lt-on-ink);
+  box-shadow: 0 2px 8px oklch(17% 0.032 75 / 0.20);
 }
 
 /* ─── Search ───────────────────────────────────────────────────── */
-.lt-search-wrap {
-  position: relative;
-}
+.lt-search-wrap { position: relative; }
 
 .lt-search-input {
   width: 100%;
@@ -165,14 +230,225 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  cursor: pointer;
-  transition: box-shadow 160ms ease-out, transform 160ms ease-out;
+  transition: box-shadow 160ms ease-out, transform 160ms ease-out,
+              background 160ms ease-out;
 }
 
+/* lifted hover shadow also uses warm-tinted color */
 .lt-card:hover {
-  box-shadow: 0 6px 24px oklch(17% 0.04 263 / 0.10),
-              0 2px 6px  oklch(17% 0.04 263 / 0.06);
+  background: var(--lt-surface-hover);
+  box-shadow: 0 6px 24px oklch(17% 0.032 75 / 0.10),
+              0 2px 6px  oklch(17% 0.032 75 / 0.06);
   transform: translateY(-1px);
+}
+
+/* Status-aware card accent ring (inset, no layout shift) */
+.lt-card[data-status="warning"] {
+  box-shadow: inset 0 0 0 1.5px oklch(78% 0.100 65 / 0.60),
+              var(--lt-card-shadow);
+}
+.lt-card[data-status="warning"]:hover {
+  box-shadow: inset 0 0 0 1.5px oklch(78% 0.100 65 / 0.60),
+              0 6px 24px oklch(17% 0.032 75 / 0.10),
+              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+}
+.lt-card[data-status="danger"] {
+  box-shadow: inset 0 0 0 1.5px oklch(72% 0.130 27 / 0.55),
+              var(--lt-card-shadow);
+}
+.lt-card[data-status="danger"]:hover {
+  box-shadow: inset 0 0 0 1.5px oklch(72% 0.130 27 / 0.55),
+              0 6px 24px oklch(17% 0.032 75 / 0.10),
+              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+}
+.lt-card[data-status="expired"] {
+  box-shadow: inset 0 0 0 1.5px oklch(65% 0.016 80 / 0.45),
+              var(--lt-card-shadow);
+}
+.lt-card[data-status="expired"]:hover {
+  box-shadow: inset 0 0 0 1.5px oklch(65% 0.016 80 / 0.45),
+              0 6px 24px oklch(17% 0.032 75 / 0.10),
+              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+}
+
+/* ─── Status Summary (proportional bar chart) ──────────────────── */
+.lt-status-summary { margin-bottom: 14px; }
+
+.lt-status-bar {
+  height: 7px;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+  background: var(--lt-track);
+}
+
+/* ─── Skeleton shimmer ─────────────────────────────────────────── */
+.lt-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--lt-skel-base)  0%,
+    var(--lt-skel-shine) 50%,
+    var(--lt-skel-base)  100%
+  );
+  background-size: 200% 100%;
+  animation: lt-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes lt-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes lt-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lt-spin { animation: lt-spin 1s linear infinite; }
+
+/* ─── Floating Action Button ───────────────────────────────────── */
+.lt-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: var(--lt-fab-bg);
+  color: var(--lt-fab-color);
+  border: none;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px oklch(10% 0.025 75 / 0.32);
+  z-index: 50;
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.lt-fab:hover {
+  transform: scale(1.07);
+  box-shadow: 0 6px 28px oklch(10% 0.025 75 / 0.44);
+}
+
+.lt-fab:active { transform: scale(0.96); }
+
+@media (max-width: 640px) {
+  .lt-fab { display: flex; }
+}
+
+/* ─── Danger hover background (adapts to dark mode) ───────────── */
+:root { --lt-danger-hover-bg: oklch(97% 0.018 30); }
+@media (prefers-color-scheme: dark) {
+  :root { --lt-danger-hover-bg: oklch(22% 0.025 25); }
+}
+
+/* ─── Overflow dropdown menu ───────────────────────────────────── */
+.lt-overflow-menu { position: relative; }
+
+.lt-overflow-dropdown {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  background: var(--lt-surface);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px oklch(17% 0.032 75 / 0.14),
+              0 1px 4px  oklch(17% 0.032 75 / 0.08);
+  padding: 5px;
+  min-width: 108px;
+  z-index: 20;
+  border: 1px solid var(--lt-border-muted);
+}
+
+.lt-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lt-ink-2);
+  font-family: inherit;
+  transition: background 100ms ease-out;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.lt-overflow-item:hover { background: var(--lt-surface-2); }
+
+.lt-overflow-item.danger { color: var(--lt-danger); }
+
+.lt-overflow-item.danger:hover { background: var(--lt-danger-hover-bg); }
+
+@media (prefers-color-scheme: dark) {
+  .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
+}
+
+/* ─── Tag chip input ───────────────────────────────────────────── */
+.lt-tag-input-wrap {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid var(--lt-border);
+  background: var(--lt-surface);
+  padding: 6px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+  cursor: text;
+}
+
+.lt-tag-input-wrap:focus-within {
+  border-color: var(--lt-ink-1);
+  box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
+}
+
+@media (prefers-color-scheme: dark) {
+  .lt-tag-input-wrap:focus-within {
+    box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12);
+  }
+}
+
+.lt-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 9px;
+  border-radius: 9999px;
+  background: var(--lt-tag-bg);
+  color: var(--lt-tag-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lt-tag-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--lt-tag-text);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.55;
+  transition: opacity 100ms ease-out, background 100ms ease-out;
+  font-family: inherit;
+}
+
+.lt-tag-chip-remove:hover {
+  opacity: 1;
+  background: oklch(83% 0.018 80 / 0.5);
 }
 
 /* ─── Stat Box (consumption) ───────────────────────────────────── */
@@ -192,15 +468,15 @@ body {
 .lt-cold-start {
   background: var(--lt-surface-2);
   border-radius: 14px;
-  padding: 32px 20px;
+  padding: 28px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--lt-ink-4);
 }
 
-/* ─── Tag chip ──────────────────────────────────────────────────── */
+/* ─── Tag chip (display-only) ───────────────────────────────────── */
 .lt-tag {
   display: inline-flex;
   align-items: center;
@@ -225,7 +501,7 @@ body {
 .lt-input {
   height: 44px;
   border-radius: 12px;
-  border: 1.5px solid oklch(88% 0.010 120);
+  border: 1.5px solid var(--lt-border);
   background: var(--lt-surface);
   padding: 0 14px;
   font-size: 16px;
@@ -238,14 +514,18 @@ body {
 
 .lt-input:focus {
   border-color: var(--lt-ink-1);
-  box-shadow: 0 0 0 3px oklch(17% 0.04 263 / 0.10);
+  box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
+}
+
+@media (prefers-color-scheme: dark) {
+  .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
 }
 
 .lt-input::placeholder { color: var(--lt-ink-4); }
 
 .lt-textarea {
   border-radius: 12px;
-  border: 1.5px solid oklch(88% 0.010 120);
+  border: 1.5px solid var(--lt-border);
   background: var(--lt-surface);
   padding: 12px 14px;
   font-size: 16px;
@@ -261,13 +541,17 @@ body {
 
 .lt-textarea:focus { border-color: var(--lt-ink-1); }
 
-/* ─── Segmented (form type selector) ───────────────────────────── */
+/* ─── Segmented control ─────────────────────────────────────────── */
 .lt-seg {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: oklch(92% 0.008 120);
+  background: oklch(92% 0.010 88);
   border-radius: 12px;
   padding: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lt-seg { background: oklch(30% 0.013 80); }
 }
 
 .lt-seg-btn {
@@ -285,7 +569,7 @@ body {
 .lt-seg-btn.active {
   background: var(--lt-surface);
   color: var(--lt-ink-1);
-  box-shadow: 0 1px 4px oklch(17% 0.04 263 / 0.08);
+  box-shadow: 0 1px 4px oklch(17% 0.032 75 / 0.08);
 }
 
 /* ─── Dialog buttons ────────────────────────────────────────────── */
@@ -305,25 +589,17 @@ body {
   gap: 6px;
 }
 
-.lt-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+.lt-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .lt-btn-primary {
   background: var(--lt-ink-1);
-  color: oklch(97% 0.003 88);
+  color: var(--lt-on-ink);
   padding: 0 24px;
   letter-spacing: -0.01em;
 }
 
-.lt-btn-primary:not(:disabled):hover {
-  filter: brightness(1.15);
-}
-
-.lt-btn-primary:not(:disabled):active {
-  filter: brightness(0.92);
-}
+.lt-btn-primary:not(:disabled):hover  { filter: brightness(1.15); }
+.lt-btn-primary:not(:disabled):active { filter: brightness(0.92); }
 
 .lt-btn-ghost {
   background: var(--lt-surface-2);
@@ -331,25 +607,48 @@ body {
   padding: 0 16px;
 }
 
-.lt-btn-ghost:not(:disabled):hover {
-  background: oklch(89% 0.012 120);
-  color: var(--lt-ink-1);
+.lt-btn-ghost:not(:disabled):hover  { background: oklch(89% 0.012 88); color: var(--lt-ink-1); }
+.lt-btn-ghost:not(:disabled):active { filter: brightness(0.94); }
+
+@media (prefers-color-scheme: dark) {
+  .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); }
 }
 
-.lt-btn-ghost:not(:disabled):active {
-  filter: brightness(0.94);
-}
-
-/* Full-width two-column modal footer */
+/* ─── Modal footer ──────────────────────────────────────────────── */
 .lt-modal-footer {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 8px;
   margin-top: 22px;
   padding-top: 18px;
-  border-top: 1px solid var(--lt-border);
+  border-top: 1px solid var(--lt-border-muted);
 }
 
-.lt-modal-footer .lt-btn {
-  width: 100%;
+.lt-modal-footer .lt-btn { width: 100%; }
+
+/* ─── Card Actions (always visible on touch devices) ───────────── */
+@media (max-width: 640px) {
+  .lt-card-actions {
+    grid-template-rows: 1fr !important;
+    margin-top: 2px !important;
+  }
+  .lt-card-actions-inner {
+    opacity: 1 !important;
+  }
+}
+
+/* ─── Desktop 2-column card list ───────────────────────────────── */
+.lt-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 800px) {
+  .lt-card-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
 }
