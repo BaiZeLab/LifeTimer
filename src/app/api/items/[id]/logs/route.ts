@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getConsumptionLogs, getConsumptionItem } from "@/lib/items-query";
+import { requireSession, requireItemOwnership } from "@/lib/api-auth";
 import type { CreateLogBody } from "@/types/api";
 
 function jsonError(msg: string, status: number) {
@@ -10,9 +11,15 @@ function jsonError(msg: string, status: number) {
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/items/[id]/logs
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id } = await params;
   const numId = Number(id);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
+
   const rows = await sql`SELECT item_id FROM consumption_items WHERE item_id = ${numId}`;
   if (rows.length === 0) return jsonError("Not found or not a consumption item", 404);
   return NextResponse.json(await getConsumptionLogs(numId));
@@ -20,8 +27,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 // POST /api/items/[id]/logs
 export async function POST(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id } = await params;
   const numId = Number(id);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
 
   const consRows = await sql`SELECT item_id FROM consumption_items WHERE item_id = ${numId}`;
   if (consRows.length === 0) return jsonError("Not found or not a consumption item", 404);
@@ -52,6 +64,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       id: log.id, itemId: log.item_id, recordedAt: log.recorded_at,
       value: log.value, isTopup: log.is_topup, isAnomaly: log.is_anomaly, notes: log.notes,
     },
-    item: await getConsumptionItem(numId),
+    item: await getConsumptionItem(numId, session.user.id),
   }, { status: 201 });
 }

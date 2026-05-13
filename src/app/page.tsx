@@ -5,13 +5,14 @@ import { createPortal } from "react-dom";
 import {
   Plus, Search, X, LayoutGrid, RefreshCw, RotateCcw, Trash2, PlusCircle,
   AlertTriangle, ChevronDown, ChevronUp, AlertCircle, Pencil, Archive,
-  TrendingDown, MoreHorizontal, Timer, Gauge,
+  TrendingDown, MoreHorizontal, Timer, Gauge, LogOut, Settings,
 } from "lucide-react";
 import Link from "next/link";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import type { DeadlineItemDTO, ConsumptionItemDTO, DeadlineRenewal, ConsumptionLog, ItemStatus } from "@/types/api";
+import { useSession, signOut } from "@/lib/auth-client";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1544,6 +1545,10 @@ function EmptyState({ isSearch, tab }: { isSearch: boolean; tab: Tab }) {
 // ── Home ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const { data: session } = useSession();
+  const user = session?.user;
+  const isAdmin = user?.role === "admin";
+
   const [tab, setTab] = useState<Tab>("deadline");
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -1613,6 +1618,25 @@ export default function Home() {
             <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--lt-ink-1)", letterSpacing: "-0.025em", lineHeight: 1.1, margin: 0 }}>
               Life Timer
             </h1>
+            {user && (
+              <div className="lt-user-badge" style={{ marginTop: "6px" }}>
+                <span className="lt-user-badge-name">{user.name}</span>
+                {isAdmin && (
+                  <Link href="/admin/users" title="用户管理"
+                    style={{ color: "var(--lt-ink-3)", display: "flex", alignItems: "center" }}>
+                    <Settings size={13} strokeWidth={1.8} />
+                  </Link>
+                )}
+                <button
+                  className="lt-signout-btn"
+                  onClick={() => signOut().then(() => (window.location.href = "/auth/login"))}
+                  title="退出登录"
+                >
+                  <LogOut size={12} strokeWidth={2} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />
+                  退出
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
             <Link href="/archived" style={{

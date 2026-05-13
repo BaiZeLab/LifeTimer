@@ -1,6 +1,122 @@
 import sql from "./db";
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** True when the "user" table already uses better-auth's camelCase column names. */
+async function authSchemaIsCorrect(): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'user'
+      AND column_name = 'emailVerified'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+// ── Main migration ─────────────────────────────────────────────────────────
+
 export async function migrate(): Promise<void> {
+
+  // ── Phase 1: Auth tables ──────────────────────────────────────────────
+  //
+  // better-auth requires camelCase column names (emailVerified, createdAt …).
+  // If the tables were created with snake_case (old schema), we drop and
+  // recreate. This is safe because no real user data exists yet at this point.
+
+  const needsAuthRebuild = !(await authSchemaIsCorrect());
+
+  if (needsAuthRebuild) {
+    // Drop in reverse FK-dependency order so CASCADE isn't needed on "user".
+    await sql`DROP TABLE IF EXISTS invite_codes`;
+    await sql`DROP TABLE IF EXISTS "account"`;
+    await sql`DROP TABLE IF EXISTS "session"`;
+    await sql`DROP TABLE IF EXISTS "verification"`;
+    // CASCADE removes FK constraints on items.user_id, will be re-added below.
+    await sql`DROP TABLE IF EXISTS "user" CASCADE`;
+  }
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS "user" (
+      id              TEXT        PRIMARY KEY,
+      name            TEXT        NOT NULL,
+      email           TEXT        NOT NULL UNIQUE,
+      "emailVerified" BOOLEAN     NOT NULL DEFAULT FALSE,
+      image           TEXT,
+      "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      role            TEXT        DEFAULT 'user',
+      banned          BOOLEAN,
+      "banReason"     TEXT,
+      "banExpires"    TIMESTAMPTZ
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS "session" (
+      id                TEXT        PRIMARY KEY,
+      "expiresAt"       TIMESTAMPTZ NOT NULL,
+      token             TEXT        NOT NULL UNIQUE,
+      "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "ipAddress"       TEXT,
+      "userAgent"       TEXT,
+      "userId"          TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "impersonatedBy"  TEXT
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS "account" (
+      id                        TEXT        PRIMARY KEY,
+      "accountId"               TEXT        NOT NULL,
+      "providerId"              TEXT        NOT NULL,
+      "userId"                  TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "accessToken"             TEXT,
+      "refreshToken"            TEXT,
+      "idToken"                 TEXT,
+      "accessTokenExpiresAt"    TIMESTAMPTZ,
+      "refreshTokenExpiresAt"   TIMESTAMPTZ,
+      scope                     TEXT,
+      password                  TEXT,
+      "createdAt"               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS "verification" (
+      id          TEXT        PRIMARY KEY,
+      identifier  TEXT        NOT NULL,
+      value       TEXT        NOT NULL,
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "createdAt" TIMESTAMPTZ,
+      "updatedAt" TIMESTAMPTZ
+    )
+  `;
+
+  // ── Invite codes (our own table — snake_case is fine) ─────────────────
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS invite_codes (
+      code        TEXT        PRIMARY KEY,
+      created_by  TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      used_by     TEXT        REFERENCES "user"(id),
+      used_at     TIMESTAMPTZ,
+      expires_at  TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  // ── Demo user (存量数据归属) ──────────────────────────────────────────
+
+  await sql`
+    INSERT INTO "user" (id, name, email, "emailVerified", role)
+    VALUES ('demo', 'Demo', 'demo@lifetimer.local', true, 'user')
+    ON CONFLICT (id) DO NOTHING
+  `;
+
+  // ── App tables ────────────────────────────────────────────────────────
+
   await sql`
     CREATE TABLE IF NOT EXISTS items (
       id          SERIAL PRIMARY KEY,
@@ -8,6 +124,7 @@ export async function migrate(): Promise<void> {
       type        TEXT    NOT NULL CHECK(type IN ('deadline','consumption')),
       notes       TEXT,
       archived_at TEXT,
+      user_id     TEXT,
       created_at  TEXT    NOT NULL DEFAULT TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS."000Z"'),
       updated_at  TEXT    NOT NULL DEFAULT TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS."000Z"')
     )
@@ -69,8 +186,29 @@ export async function migrate(): Promise<void> {
     )
   `;
 
+  // ── items.user_id: add column + FK (idempotent) ───────────────────────
+
+  // Add column if it doesn't exist (no-op if already present)
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS user_id TEXT`;
+
+  // Assign existing rows to demo
+  await sql`UPDATE items SET user_id = 'demo' WHERE user_id IS NULL`;
+
+  // Re-add FK constraint idempotently (drop first, then add)
+  await sql`ALTER TABLE items DROP CONSTRAINT IF EXISTS items_user_id_fkey`;
+  await sql`
+    ALTER TABLE items
+    ADD CONSTRAINT items_user_id_fkey
+    FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE
+  `;
+
+  // ── Indexes ───────────────────────────────────────────────────────────
+
   await sql`CREATE INDEX IF NOT EXISTS idx_items_type     ON items(type)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_items_archived ON items(archived_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_items_user     ON items(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_cons_logs_item ON consumption_logs(item_id, recorded_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_renewals_item  ON deadline_renewals(item_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_session_user   ON "session"("userId")`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_session_token  ON "session"(token)`;
 }

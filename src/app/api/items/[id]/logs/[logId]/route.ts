@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getConsumptionItem } from "@/lib/items-query";
+import { requireSession, requireItemOwnership } from "@/lib/api-auth";
 import type { PatchLogBody } from "@/types/api";
 
 function jsonError(msg: string, status: number) {
@@ -11,9 +12,14 @@ type Params = { params: Promise<{ id: string; logId: string }> };
 
 // PATCH /api/items/[id]/logs/[logId]
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id, logId } = await params;
   const numId = Number(id);
   const numLogId = Number(logId);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
 
   const logRows = await sql`
     SELECT id FROM consumption_logs WHERE id = ${numLogId} AND item_id = ${numId}
@@ -43,15 +49,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       id: updated.id, itemId: updated.item_id, recordedAt: updated.recorded_at,
       value: updated.value, isTopup: updated.is_topup, isAnomaly: updated.is_anomaly, notes: updated.notes,
     },
-    item: await getConsumptionItem(numId),
+    item: await getConsumptionItem(numId, session.user.id),
   });
 }
 
 // DELETE /api/items/[id]/logs/[logId]
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id, logId } = await params;
   const numId = Number(id);
   const numLogId = Number(logId);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
 
   const rows = await sql`
     DELETE FROM consumption_logs WHERE id = ${numLogId} AND item_id = ${numId} RETURNING id
@@ -59,5 +70,5 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (rows.length === 0) return jsonError("Not found", 404);
 
   await sql`UPDATE items SET updated_at = ${new Date().toISOString()} WHERE id = ${numId}`;
-  return NextResponse.json({ item: await getConsumptionItem(numId) });
+  return NextResponse.json({ item: await getConsumptionItem(numId, session.user.id) });
 }

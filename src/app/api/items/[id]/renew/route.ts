@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getDeadlineItem } from "@/lib/items-query";
+import { requireSession, requireItemOwnership } from "@/lib/api-auth";
 import type { RenewBody } from "@/types/api";
 
 function jsonError(msg: string, status: number) {
@@ -11,8 +12,13 @@ type Params = { params: Promise<{ id: string }> };
 
 // POST /api/items/[id]/renew
 export async function POST(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id } = await params;
   const numId = Number(id);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
 
   const rows = await sql`SELECT expire_date, start_date FROM deadline_items WHERE item_id = ${numId}` as {
     expire_date: string; start_date: string | null;
@@ -38,5 +44,5 @@ export async function POST(req: NextRequest, { params }: Params) {
     txSql`UPDATE items SET updated_at = ${now} WHERE id = ${numId}`,
   ]);
 
-  return NextResponse.json(await getDeadlineItem(numId));
+  return NextResponse.json(await getDeadlineItem(numId, session.user.id));
 }

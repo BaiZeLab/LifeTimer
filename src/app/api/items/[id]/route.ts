@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { syncItemTags } from "@/lib/tags";
 import { getItem } from "@/lib/items-query";
+import { requireSession, requireItemOwnership } from "@/lib/api-auth";
 import type { PatchItemBody } from "@/types/api";
 
 function jsonError(msg: string, status: number) {
@@ -11,17 +12,30 @@ function jsonError(msg: string, status: number) {
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/items/[id]
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id } = await params;
-  const item = await getItem(Number(id));
+  const numId = Number(id);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
+
+  const item = await getItem(numId, session.user.id);
   if (!item) return jsonError("Not found", 404);
   return NextResponse.json(item);
 }
 
 // PATCH /api/items/[id]
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id } = await params;
   const numId = Number(id);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
+
   const body: PatchItemBody = await req.json().catch(() => ({}));
 
   const existing = (await sql`SELECT id, type, archived_at FROM items WHERE id = ${numId}` as {
@@ -62,13 +76,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await syncItemTags(numId, body.tags);
   }
 
-  return NextResponse.json(await getItem(numId));
+  return NextResponse.json(await getItem(numId, session.user.id));
 }
 
 // DELETE /api/items/[id]
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
   const { id } = await params;
-  const rows = await sql`DELETE FROM items WHERE id = ${Number(id)} RETURNING id` as { id: number }[];
+  const numId = Number(id);
+
+  const ownershipError = await requireItemOwnership(numId, session.user.id);
+  if (ownershipError) return ownershipError;
+
+  const rows = await sql`DELETE FROM items WHERE id = ${numId} RETURNING id` as { id: number }[];
   if (rows.length === 0) return jsonError("Not found", 404);
   return new NextResponse(null, { status: 204 });
 }

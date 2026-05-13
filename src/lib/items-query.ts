@@ -10,6 +10,7 @@ interface ItemRow {
   type: "deadline" | "consumption";
   notes: string | null;
   archived_at: string | null;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -92,25 +93,26 @@ function mapDeadline(row: DeadlineRow, tags: string[]): DeadlineItemDTO {
   };
 }
 
-export async function getDeadlineItems(archivedOnly = false): Promise<DeadlineItemDTO[]> {
+export async function getDeadlineItems(userId: string, archivedOnly = false): Promise<DeadlineItemDTO[]> {
   const rows = await sql`
     SELECT i.*, d.expire_date, d.start_date, d.alert_days
     FROM items i
     JOIN deadline_items d ON d.item_id = i.id
-    WHERE (${archivedOnly} AND i.archived_at IS NOT NULL)
-       OR (NOT ${archivedOnly} AND i.archived_at IS NULL)
+    WHERE i.user_id = ${userId}
+      AND ((${archivedOnly} AND i.archived_at IS NOT NULL)
+        OR (NOT ${archivedOnly} AND i.archived_at IS NULL))
   ` as DeadlineRow[];
 
   const tagMap = await fetchTagsByItemIds(rows.map((r) => r.id));
   return rows.map((r) => mapDeadline(r, tagMap.get(r.id) ?? []));
 }
 
-export async function getDeadlineItem(id: number): Promise<DeadlineItemDTO | null> {
+export async function getDeadlineItem(id: number, userId: string): Promise<DeadlineItemDTO | null> {
   const rows = await sql`
     SELECT i.*, d.expire_date, d.start_date, d.alert_days
     FROM items i
     JOIN deadline_items d ON d.item_id = i.id
-    WHERE i.id = ${id}
+    WHERE i.id = ${id} AND i.user_id = ${userId}
   ` as DeadlineRow[];
   if (!rows[0]) return null;
   const tagMap = await fetchTagsByItemIds([id]);
@@ -153,13 +155,14 @@ function mapConsumption(row: ConsumptionRow, tags: string[], logs: LogRow[]): Co
   };
 }
 
-export async function getConsumptionItems(archivedOnly = false): Promise<ConsumptionItemDTO[]> {
+export async function getConsumptionItems(userId: string, archivedOnly = false): Promise<ConsumptionItemDTO[]> {
   const rows = await sql`
     SELECT i.*, c.unit, c.alert_days
     FROM items i
     JOIN consumption_items c ON c.item_id = i.id
-    WHERE (${archivedOnly} AND i.archived_at IS NOT NULL)
-       OR (NOT ${archivedOnly} AND i.archived_at IS NULL)
+    WHERE i.user_id = ${userId}
+      AND ((${archivedOnly} AND i.archived_at IS NOT NULL)
+        OR (NOT ${archivedOnly} AND i.archived_at IS NULL))
   ` as ConsumptionRow[];
 
   const itemIds = rows.map((r) => r.id);
@@ -171,12 +174,12 @@ export async function getConsumptionItems(archivedOnly = false): Promise<Consump
   return rows.map((r) => mapConsumption(r, tagMap.get(r.id) ?? [], logMap.get(r.id) ?? []));
 }
 
-export async function getConsumptionItem(id: number): Promise<ConsumptionItemDTO | null> {
+export async function getConsumptionItem(id: number, userId: string): Promise<ConsumptionItemDTO | null> {
   const rows = await sql`
     SELECT i.*, c.unit, c.alert_days
     FROM items i
     JOIN consumption_items c ON c.item_id = i.id
-    WHERE i.id = ${id}
+    WHERE i.id = ${id} AND i.user_id = ${userId}
   ` as ConsumptionRow[];
   if (!rows[0]) return null;
 
@@ -189,10 +192,16 @@ export async function getConsumptionItem(id: number): Promise<ConsumptionItemDTO
 
 // ── Mixed ─────────────────────────────────────────────────────────────────
 
-export async function getItem(id: number): Promise<ItemDTO | null> {
-  const rows = await sql`SELECT type FROM items WHERE id = ${id}` as { type: string }[];
+export async function getItem(id: number, userId: string): Promise<ItemDTO | null> {
+  const rows = await sql`SELECT type FROM items WHERE id = ${id} AND user_id = ${userId}` as { type: string }[];
   if (!rows[0]) return null;
-  return rows[0].type === "deadline" ? getDeadlineItem(id) : getConsumptionItem(id);
+  return rows[0].type === "deadline" ? getDeadlineItem(id, userId) : getConsumptionItem(id, userId);
+}
+
+// Ownership check only (no full DTO needed)
+export async function getItemOwner(id: number): Promise<string | null> {
+  const rows = await sql`SELECT user_id FROM items WHERE id = ${id}` as { user_id: string }[];
+  return rows[0]?.user_id ?? null;
 }
 
 // ── Logs ──────────────────────────────────────────────────────────────────

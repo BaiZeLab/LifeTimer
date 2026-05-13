@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
 import type { DeadlineItemDTO, ConsumptionItemDTO } from "@/types/api";
+// archived page is protected by middleware; session state managed globally
 
 type AnyItem = DeadlineItemDTO | ConsumptionItemDTO;
 type FilterType = "all" | "deadline" | "consumption";

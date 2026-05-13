@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { syncItemTags } from "@/lib/tags";
 import { getDeadlineItems, getConsumptionItems, getItem } from "@/lib/items-query";
+import { requireSession } from "@/lib/api-auth";
 import type { CreateItemBody } from "@/types/api";
 
 function jsonError(msg: string, status: number) {
@@ -10,25 +11,33 @@ function jsonError(msg: string, status: number) {
 
 // GET /api/items?type=deadline|consumption&archived=false
 export async function GET(req: NextRequest) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
+  const userId = session.user.id;
+
   const { searchParams } = req.nextUrl;
   const type = searchParams.get("type");
   const archivedOnly = searchParams.get("archived") === "true";
 
   if (type === "deadline") {
-    return NextResponse.json(await getDeadlineItems(archivedOnly));
+    return NextResponse.json(await getDeadlineItems(userId, archivedOnly));
   }
   if (type === "consumption") {
-    return NextResponse.json(await getConsumptionItems(archivedOnly));
+    return NextResponse.json(await getConsumptionItems(userId, archivedOnly));
   }
   const [deadline, consumption] = await Promise.all([
-    getDeadlineItems(archivedOnly),
-    getConsumptionItems(archivedOnly),
+    getDeadlineItems(userId, archivedOnly),
+    getConsumptionItems(userId, archivedOnly),
   ]);
   return NextResponse.json({ deadline, consumption });
 }
 
 // POST /api/items
 export async function POST(req: NextRequest) {
+  const { session, error } = await requireSession(req);
+  if (error) return error;
+  const userId = session.user.id;
+
   const body: CreateItemBody = await req.json().catch(() => null);
   if (!body) return jsonError("Invalid JSON", 400);
   if (!body.name?.trim()) return jsonError("name is required", 400);
@@ -43,8 +52,8 @@ export async function POST(req: NextRequest) {
       const alertDays = body.alertDays ?? 30;
       const [{ id }] = await sql`
         WITH new_item AS (
-          INSERT INTO items (name, type, notes)
-          VALUES (${body.name.trim()}, 'deadline', ${body.notes ?? null})
+          INSERT INTO items (name, type, notes, user_id)
+          VALUES (${body.name.trim()}, 'deadline', ${body.notes ?? null}, ${userId})
           RETURNING id
         ),
         _detail AS (
@@ -59,8 +68,8 @@ export async function POST(req: NextRequest) {
       const alertDays = body.alertDays ?? 7;
       const [{ id }] = await sql`
         WITH new_item AS (
-          INSERT INTO items (name, type, notes)
-          VALUES (${body.name.trim()}, 'consumption', ${body.notes ?? null})
+          INSERT INTO items (name, type, notes, user_id)
+          VALUES (${body.name.trim()}, 'consumption', ${body.notes ?? null}, ${userId})
           RETURNING id
         ),
         _detail AS (
@@ -74,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     if (body.tags?.length) await syncItemTags(itemId, body.tags);
 
-    return NextResponse.json(await getItem(itemId), { status: 201 });
+    return NextResponse.json(await getItem(itemId, userId), { status: 201 });
   } catch (e) {
     return jsonError((e as Error).message, 400);
   }
