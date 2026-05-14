@@ -9,8 +9,13 @@ services:
     ports:
       - "3425:3100"
     env_file:
-      - .env.local
+      - .env.local   # 只需要 DATABASE_URL；BETTER_AUTH_SECRET 会自动生成
+    volumes:
+      - life-timer-data:/app/data   # 持久化 auth secret，容器重建后 session 不失效
     restart: unless-stopped
+
+volumes:
+  life-timer-data:
 
 networks:
   default:

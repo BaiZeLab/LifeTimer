@@ -81,6 +81,22 @@ function LoginForm() {
         <p className="lt-auth-footer">
           有邀请码？<Link href="/auth/register" className="lt-auth-link">注册账号</Link>
         </p>
+
+        <div style={{ marginTop: "12px", textAlign: "center" }}>
+          <Link href="/demo" style={{
+            fontSize: "13px", color: "var(--lt-ink-4)",
+            textDecoration: "none", display: "inline-flex",
+            alignItems: "center", gap: "4px",
+            padding: "8px 16px", borderRadius: "10px",
+            border: "1px solid var(--lt-border-muted)",
+            transition: "background 150ms ease-out, color 150ms ease-out",
+          }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "var(--lt-surface-2)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--lt-ink-2)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = ""; (e.currentTarget as HTMLAnchorElement).style.color = ""; }}
+          >
+            先看看演示 →
+          </Link>
+        </div>
       </div>
     </div>
   );

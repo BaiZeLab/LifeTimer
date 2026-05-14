@@ -7,7 +7,10 @@ import { Pool } from "@neondatabase/serverless";
 export const auth = betterAuth({
   database: new Pool({ connectionString: process.env.DATABASE_URL }),
   secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL,
+  // baseURL is intentionally omitted: better-auth derives it from incoming
+  // requests, which works correctly for email/password auth without OAuth.
+  // Set BETTER_AUTH_URL in .env.local only if you need OAuth callbacks.
+  ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
   emailAndPassword: {
     enabled: true,
     // Public sign-up is blocked at the middleware level.

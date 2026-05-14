@@ -1,8 +1,7 @@
 import sql from "./db";
 
 /**
- * Returns true if at least one real (non-demo) user exists.
- * The demo account created by migration is not counted as "initialized".
+ * Returns true if at least one user account exists.
  */
 export async function isInitialized(): Promise<boolean> {
   const rows = await sql`

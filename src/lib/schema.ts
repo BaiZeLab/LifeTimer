@@ -107,12 +107,30 @@ export async function migrate(): Promise<void> {
     )
   `;
 
-  // ── Demo user (存量数据归属) ──────────────────────────────────────────
+  // ── Phase 3: Clean up legacy demo user ───────────────────────────────
+  //
+  // Older deployments created a 'demo' user as a placeholder for existing
+  // items. Now that demo mode is fully client-side, we reassign demo-owned
+  // items to the first admin and remove the demo account. This runs only
+  // once — once the demo row is gone it becomes a no-op.
 
   await sql`
-    INSERT INTO "user" (id, name, email, "emailVerified", role)
-    VALUES ('demo', 'Demo', 'demo@lifetimer.local', true, 'user')
-    ON CONFLICT (id) DO NOTHING
+    DO $$
+    DECLARE
+      v_admin_id TEXT;
+    BEGIN
+      SELECT id INTO v_admin_id
+        FROM "user"
+       WHERE email != 'demo@lifetimer.local'
+         AND role = 'admin'
+       LIMIT 1;
+
+      IF v_admin_id IS NOT NULL THEN
+        UPDATE items SET user_id = v_admin_id
+         WHERE user_id = 'demo';
+        DELETE FROM "user" WHERE id = 'demo';
+      END IF;
+    END $$
   `;
 
   // ── App tables ────────────────────────────────────────────────────────
@@ -191,8 +209,7 @@ export async function migrate(): Promise<void> {
   // Add column if it doesn't exist (no-op if already present)
   await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS user_id TEXT`;
 
-  // Assign existing rows to demo
-  await sql`UPDATE items SET user_id = 'demo' WHERE user_id IS NULL`;
+  // Leave NULL user_id rows as-is; they will be assigned once admin is created
 
   // Re-add FK constraint idempotently (drop first, then add)
   await sql`ALTER TABLE items DROP CONSTRAINT IF EXISTS items_user_id_fkey`;

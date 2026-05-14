@@ -43,6 +43,7 @@ const PUBLIC_PATHS = [
   "/api/auth/register",
   "/api/auth/setup",
   "/api/auth/setup-status",
+  "/demo",
 ];
 
 // better-auth manages its own routes under /api/auth/**
