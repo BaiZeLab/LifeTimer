@@ -106,7 +106,7 @@ function DayBadge({ daysLeft, status, pct }: { daysLeft: number; status: ItemSta
       <div style={{
         position: "absolute", inset: 0,
         display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", gap: "1px",
+        alignItems: "center", justifyContent: "center", gap: "3px",
       }}>
         {status === "expired" ? (
           <span style={{ fontSize: "11px", fontWeight: 700, color: cfg.numColor, textAlign: "center", lineHeight: 1.2 }}>
@@ -115,12 +115,12 @@ function DayBadge({ daysLeft, status, pct }: { daysLeft: number; status: ItemSta
         ) : (
           <>
             <span style={{
-              fontSize: daysLeft > 999 ? "18px" : daysLeft > 99 ? "22px" : "28px",
+              fontSize: daysLeft > 999 ? "15px" : daysLeft > 99 ? "19px" : daysLeft > 9 ? "26px" : "28px",
               fontWeight: 700, color: cfg.numColor, lineHeight: 1, letterSpacing: "-0.025em",
             }}>
               {Math.abs(daysLeft)}
             </span>
-            <span style={{ fontSize: "10px", fontWeight: 700, color: cfg.labelColor }}>天</span>
+            <span style={{ fontSize: "10px", fontWeight: 600, color: cfg.labelColor, lineHeight: 1 }}>天</span>
           </>
         )}
       </div>
@@ -511,8 +511,16 @@ function ConsumptionChart({ logs, unit, estimatedDays, status, chartId }: {
   let minV = Math.min(...values), maxV = Math.max(...values);
 
   const hasPred = estimatedDays > 0;
-  const predT = hasPred ? Date.now() + estimatedDays * 86_400_000 : null;
   const nowT = Date.now();
+  const maxDataT = Math.max(...times);
+  const dataSpanMs = maxDataT - minT || 1;
+
+  // Adaptive cap: prediction extends at most 1.2× historical span from last data point,
+  // so historical data always occupies ≥45% of the x-axis width.
+  const predCapMs = Math.max(30 * 86_400_000, dataSpanMs * 1.2);
+  const fullPredEndT = hasPred ? nowT + estimatedDays * 86_400_000 : null;
+  const predT = hasPred ? Math.min(fullPredEndT!, maxDataT + predCapMs) : null;
+  const predTruncated = hasPred && fullPredEndT! > maxDataT + predCapMs;
 
   if (predT) maxT = Math.max(maxT, predT);
   maxT = Math.max(maxT, nowT);
@@ -540,7 +548,18 @@ function ConsumptionChart({ logs, unit, estimatedDays, status, chartId }: {
 
   const lastPt = points[points.length - 1];
   const lastLog = validLogs[validLogs.length - 1];
-  const predEndY = ty(Math.max(minV, 0));
+  const lastDataValue = lastLog.value;
+  const depleteValue = Math.max(minV, 0);
+
+  // When prediction is truncated, interpolate the endpoint Y value instead of
+  // snapping to the chart bottom, which would be visually misleading.
+  let predEndValue = depleteValue;
+  if (hasPred && predT && fullPredEndT && predTruncated) {
+    const fullSpan = fullPredEndT - maxDataT;
+    const partialSpan = predT - maxDataT;
+    predEndValue = Math.max(minV, lastDataValue - (lastDataValue - depleteValue) * (partialSpan / fullSpan));
+  }
+  const predEndY = ty(predEndValue);
   const predEndX = predT ? tx(predT) : null;
   const predLinePath = hasPred && predEndX
     ? `M ${lastPt.x} ${lastPt.y} L ${predEndX} ${predEndY}` : null;
@@ -635,7 +654,8 @@ function ConsumptionChart({ logs, unit, estimatedDays, status, chartId }: {
         )}
         {hasPred && (
           <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: "var(--lt-ink-4)" }}>
-            <LegendDash color="oklch(60% 0.060 260)" dashed />预测
+            <LegendDash color="oklch(60% 0.060 260)" dashed />
+            {predTruncated ? `预测（共 ${estimatedDays} 天）` : "预测"}
           </div>
         )}
         {nowInChart && (
