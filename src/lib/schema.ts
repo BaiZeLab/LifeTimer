@@ -228,4 +228,31 @@ export async function migrate(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_renewals_item  ON deadline_renewals(item_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_session_user   ON "session"("userId")`;
   await sql`CREATE INDEX IF NOT EXISTS idx_session_token  ON "session"(token)`;
+
+  // ── Push notification tables ───────────────────────────────────────────
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id          SERIAL PRIMARY KEY,
+      user_id     TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      endpoint    TEXT        NOT NULL UNIQUE,
+      p256dh      TEXT        NOT NULL,
+      auth        TEXT        NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)`;
+
+  // Deduplication log: prevents the same item alerting the same user more than once per day
+  await sql`
+    CREATE TABLE IF NOT EXISTS push_log (
+      id          SERIAL PRIMARY KEY,
+      user_id     TEXT        NOT NULL,
+      item_id     INTEGER     NOT NULL,
+      sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_push_log_user_item ON push_log(user_id, item_id, sent_at)`;
 }

@@ -75,37 +75,31 @@
   --radius: 0.75rem;
 }
 
-/* ─── Dark Mode ─────────────────────────────────────────────────── */
+/* ─── Dark Mode (.dark class — set by ThemeProvider) ────────────── */
+/* System-preference fallback (when JS has not yet run) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --lt-bg:         oklch(13.5% 0.014 263);
     --lt-surface:    oklch(20%   0.016 263);
     --lt-surface-2:  oklch(27%   0.013 263);
     --lt-surface-hover: oklch(24% 0.015 263);
-
     --lt-ink-1:      oklch(95%   0.005 88);
     --lt-ink-2:      oklch(80%   0.008 88);
     --lt-ink-3:      oklch(62%   0.010 88);
-    --lt-ink-4:      oklch(63%   0.008 88);  /* ~4.5:1 on dark bg, WCAG AA */
-
+    --lt-ink-4:      oklch(63%   0.008 88);
     --lt-track:      oklch(33%   0.012 263);
     --lt-tag-bg:     oklch(28%   0.025 155);
     --lt-tag-text:   oklch(72%   0.040 155);
     --lt-border-muted: oklch(33% 0.010 263);
     --lt-border:     oklch(36%   0.010 263);
     --lt-expired-color: oklch(62% 0.012 263);
-
     --lt-card-shadow: 0 2px 12px oklch(5% 0.02 263 / 0.50),
                       0 1px 3px  oklch(5% 0.02 263 / 0.35);
-
     --lt-on-ink:     oklch(18%   0.035 263);
-
     --lt-fab-bg:    oklch(86%   0.008 88);
     --lt-fab-color: oklch(18%   0.038 263);
-
     --lt-skel-base:  oklch(23%   0.012 263);
     --lt-skel-shine: oklch(29%   0.010 263);
-
     --background: var(--lt-bg);
     --foreground: var(--lt-ink-1);
     --card: var(--lt-surface);
@@ -116,7 +110,44 @@
     --muted: var(--lt-surface-2);
     --border: var(--lt-border);
     --input: oklch(30% 0.012 263);
+    --lt-danger-hover-bg: oklch(22% 0.025 25);
   }
+}
+
+/* JS-controlled dark class (overrides both light and system-dark) */
+.dark {
+  --lt-bg:         oklch(13.5% 0.014 263);
+  --lt-surface:    oklch(20%   0.016 263);
+  --lt-surface-2:  oklch(27%   0.013 263);
+  --lt-surface-hover: oklch(24% 0.015 263);
+  --lt-ink-1:      oklch(95%   0.005 88);
+  --lt-ink-2:      oklch(80%   0.008 88);
+  --lt-ink-3:      oklch(62%   0.010 88);
+  --lt-ink-4:      oklch(63%   0.008 88);
+  --lt-track:      oklch(33%   0.012 263);
+  --lt-tag-bg:     oklch(28%   0.025 155);
+  --lt-tag-text:   oklch(72%   0.040 155);
+  --lt-border-muted: oklch(33% 0.010 263);
+  --lt-border:     oklch(36%   0.010 263);
+  --lt-expired-color: oklch(62% 0.012 263);
+  --lt-card-shadow: 0 2px 12px oklch(5% 0.02 263 / 0.50),
+                    0 1px 3px  oklch(5% 0.02 263 / 0.35);
+  --lt-on-ink:     oklch(18%   0.035 263);
+  --lt-fab-bg:    oklch(86%   0.008 88);
+  --lt-fab-color: oklch(18%   0.038 263);
+  --lt-skel-base:  oklch(23%   0.012 263);
+  --lt-skel-shine: oklch(29%   0.010 263);
+  --background: var(--lt-bg);
+  --foreground: var(--lt-ink-1);
+  --card: var(--lt-surface);
+  --card-foreground: var(--lt-ink-1);
+  --popover: var(--lt-surface);
+  --popover-foreground: var(--lt-ink-1);
+  --secondary: var(--lt-surface-2);
+  --muted: var(--lt-surface-2);
+  --border: var(--lt-border);
+  --input: oklch(30% 0.012 263);
+  --lt-danger-hover-bg: oklch(22% 0.025 25);
 }
 
 @theme inline {
@@ -174,9 +205,7 @@ body {
   padding: 4px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .lt-tabs { background: oklch(28% 0.013 80); }
-}
+.dark .lt-tabs { background: oklch(28% 0.013 80); }
 
 .lt-tab {
   border: none;
@@ -336,11 +365,8 @@ body {
   .lt-fab { display: flex; }
 }
 
-/* ─── Danger hover background (adapts to dark mode) ───────────── */
+/* ─── Danger hover background (adapts to theme) ────────────────── */
 :root { --lt-danger-hover-bg: oklch(97% 0.018 30); }
-@media (prefers-color-scheme: dark) {
-  :root { --lt-danger-hover-bg: oklch(22% 0.025 25); }
-}
 
 /* ─── Overflow dropdown menu ───────────────────────────────────── */
 .lt-overflow-menu { position: relative; }
@@ -384,9 +410,7 @@ body {
 
 .lt-overflow-item.danger:hover { background: var(--lt-danger-hover-bg); }
 
-@media (prefers-color-scheme: dark) {
-  .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
-}
+.dark .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
 
 /* ─── Tag chip input ───────────────────────────────────────────── */
 .lt-tag-input-wrap {
@@ -408,10 +432,8 @@ body {
   box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
 }
 
-@media (prefers-color-scheme: dark) {
-  .lt-tag-input-wrap:focus-within {
-    box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12);
-  }
+.dark .lt-tag-input-wrap:focus-within {
+  box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12);
 }
 
 .lt-tag-chip {
@@ -517,9 +539,7 @@ body {
   box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
 }
 
-@media (prefers-color-scheme: dark) {
-  .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
-}
+.dark .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
 
 .lt-input::placeholder { color: var(--lt-ink-4); }
 
@@ -550,9 +570,7 @@ body {
   padding: 3px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .lt-seg { background: oklch(30% 0.013 80); }
-}
+.dark .lt-seg { background: oklch(30% 0.013 80); }
 
 .lt-seg-btn {
   border: none;
@@ -610,9 +628,7 @@ body {
 .lt-btn-ghost:not(:disabled):hover  { background: oklch(89% 0.012 88); color: var(--lt-ink-1); }
 .lt-btn-ghost:not(:disabled):active { filter: brightness(0.94); }
 
-@media (prefers-color-scheme: dark) {
-  .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); }
-}
+.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); }
 
 /* ─── Modal footer ──────────────────────────────────────────────── */
 .lt-modal-footer {

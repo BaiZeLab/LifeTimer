@@ -1,0 +1,49 @@
+{
+  "name": "Life Timer",
+  "short_name": "Life Timer",
+  "description": "生活倒计时管理 — 追踪到期与消耗",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F1EBDF",
+  "theme_color": "#262319",
+  "lang": "zh-CN",
+  "categories": ["lifestyle", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "新增到期提醒",
+      "short_name": "到期提醒",
+      "url": "/?add=deadline",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "新增消耗预估",
+      "short_name": "消耗预估",
+      "url": "/?add=consumption",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

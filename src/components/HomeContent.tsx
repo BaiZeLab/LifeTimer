@@ -6,7 +6,9 @@ import {
   Plus, Search, X, LayoutGrid, RefreshCw, RotateCcw, Trash2, PlusCircle,
   AlertTriangle, ChevronDown, ChevronUp, AlertCircle, Pencil, Archive,
   TrendingDown, MoreHorizontal, Timer, Gauge, LogOut, Settings, LogIn,
+  Sun, Moon, Bell, BellOff,
 } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -447,6 +449,141 @@ function SkeletonCard() {
   );
 }
 
+// ── ConsumptionHeatmap ────────────────────────────────────────────────────────
+
+/**
+ * GitHub-style calendar heatmap showing daily consumption intensity.
+ * Columns = weeks (oldest left → newest right), rows = weekday (Mon–Sun).
+ */
+function ConsumptionHeatmap({ logs, unit, status }: {
+  logs: ConsumptionLog[];
+  unit: string;
+  status: ItemStatus;
+}) {
+  const validLogs = logs
+    .filter((l) => !l.isAnomaly)
+    .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
+
+  if (validLogs.length < 2) return null;
+
+  // Build a map of dateString → daily consumption rate
+  const dailyMap = new Map<string, number>();
+
+  for (let i = 0; i < validLogs.length - 1; i++) {
+    const a = validLogs[i], b = validLogs[i + 1];
+    if (b.isTopup || b.value >= a.value) continue;
+    const startT = new Date(a.recordedAt).getTime();
+    const endT   = new Date(b.recordedAt).getTime();
+    const days   = (endT - startT) / 86_400_000;
+    if (days <= 0) continue;
+    const rate = (a.value - b.value) / days;
+    // Distribute evenly across each day in this interval
+    for (let d = 0; d < Math.ceil(days); d++) {
+      const t   = startT + d * 86_400_000;
+      const key = new Date(t).toISOString().slice(0, 10);
+      dailyMap.set(key, (dailyMap.get(key) ?? 0) + rate);
+    }
+  }
+
+  // Build 52-week grid ending today
+  const today    = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayOfWeek = today.getDay(); // 0=Sun
+  // Align end to Saturday so the last column ends today's week
+  const endDate  = new Date(today.getTime() + (6 - dayOfWeek) * 86_400_000);
+  const startDate = new Date(endDate.getTime() - 52 * 7 * 86_400_000);
+
+  // Build weeks array
+  const weeks: { date: Date; key: string; rate: number }[][] = [];
+  let week: { date: Date; key: string; rate: number }[] = [];
+  const cur = new Date(startDate);
+  while (cur <= endDate) {
+    const key = cur.toISOString().slice(0, 10);
+    week.push({ date: new Date(cur), key, rate: dailyMap.get(key) ?? 0 });
+    if (week.length === 7) { weeks.push(week); week = []; }
+    cur.setDate(cur.getDate() + 1);
+  }
+  if (week.length) weeks.push(week);
+
+  // Max rate for scaling
+  const maxRate = Math.max(...[...dailyMap.values()], 0.001);
+
+  const lineColor = CHART_LINE_COLOR[status];
+  // Parse the lineColor intensity into a usable opacity mapping
+  function cellColor(rate: number): string {
+    if (rate <= 0) return "var(--lt-track)";
+    const t = Math.min(1, rate / maxRate);
+    const opacity = 0.12 + t * 0.88;
+    return `color-mix(in oklch, ${lineColor} ${Math.round(opacity * 100)}%, transparent)`;
+  }
+
+  const CELL = 11, GAP = 2;
+  const svgW = weeks.length * (CELL + GAP);
+  const svgH = 7 * (CELL + GAP);
+
+  // Month labels
+  const monthLabels: { x: number; label: string }[] = [];
+  let lastMonth = -1;
+  weeks.forEach((week, wi) => {
+    const firstDay = week.find((d) => d.date.getDate() <= 7);
+    if (firstDay) {
+      const m = firstDay.date.getMonth();
+      if (m !== lastMonth) {
+        monthLabels.push({
+          x: wi * (CELL + GAP),
+          label: `${firstDay.date.getMonth() + 1}月`,
+        });
+        lastMonth = m;
+      }
+    }
+  });
+
+  return (
+    <div style={{ margin: "8px 0", overflowX: "auto" }}>
+      <svg
+        width={svgW}
+        height={svgH + 16}
+        viewBox={`0 0 ${svgW} ${svgH + 16}`}
+        style={{ display: "block", minWidth: svgW }}
+      >
+        {/* Month labels */}
+        {monthLabels.map((ml) => (
+          <text key={ml.x} x={ml.x} y={9} fontSize="8" fill="var(--lt-ink-4)">{ml.label}</text>
+        ))}
+        {/* Cells */}
+        {weeks.map((week, wi) =>
+          week.map((day, di) => (
+            <rect
+              key={day.key}
+              x={wi * (CELL + GAP)}
+              y={di * (CELL + GAP) + 14}
+              width={CELL}
+              height={CELL}
+              rx={2}
+              fill={cellColor(day.rate)}
+              style={{ cursor: day.rate > 0 ? "default" : undefined }}
+            >
+              {day.rate > 0 && (
+                <title>{day.key}: {day.rate.toFixed(2)} {unit}/天</title>
+              )}
+            </rect>
+          ))
+        )}
+      </svg>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "4px", justifyContent: "flex-end" }}>
+        <span style={{ fontSize: "10px", color: "var(--lt-ink-4)" }}>少</span>
+        {[0.1, 0.35, 0.6, 0.85, 1].map((t) => (
+          <div key={t} style={{
+            width: 10, height: 10, borderRadius: 2,
+            background: `color-mix(in oklch, ${lineColor} ${Math.round((0.12 + t * 0.88) * 100)}%, transparent)`,
+          }} />
+        ))}
+        <span style={{ fontSize: "10px", color: "var(--lt-ink-4)" }}>多</span>
+      </div>
+    </div>
+  );
+}
+
 // ── ConsumptionChart ──────────────────────────────────────────────────────────
 
 const CHART_LINE_COLOR: Record<ItemStatus, string> = {
@@ -488,14 +625,22 @@ function LegendDash({ color, dashed }: { color: string; dashed?: boolean }) {
   );
 }
 
-function ConsumptionChart({ logs, unit, estimatedDays, status, chartId }: {
+type ChartRange = "30" | "90" | "all";
+
+function ConsumptionChart({ logs, unit, estimatedDays, status, chartId, timeRange }: {
   logs: ConsumptionLog[];
   unit: string;
   estimatedDays: number;
   status: ItemStatus;
   chartId: string;
+  timeRange: ChartRange;
 }) {
-  const validLogs = logs.filter((l) => !l.isAnomaly).sort(
+  // Filter logs by time range before passing to chart logic
+  const cutoff = timeRange !== "all"
+    ? Date.now() - Number(timeRange) * 86_400_000
+    : 0;
+
+  const validLogs = logs.filter((l) => !l.isAnomaly && (cutoff === 0 || new Date(l.recordedAt).getTime() >= cutoff)).sort(
     (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
   );
   if (validLogs.length < 2) return null;
@@ -811,7 +956,8 @@ function ConsumptionCard({
   const [editLogValue, setEditLogValue] = useState("");
   const [editLogNotes, setEditLogNotes] = useState("");
   const [savingLog, setSavingLog] = useState(false);
-  const [showChart, setShowChart] = useState(false);
+  const [chartView, setChartView] = useState<"none" | "trend" | "heatmap">("none");
+  const [timeRange, setTimeRange] = useState<ChartRange>("all");
 
   const actionsVisible = hovered || pinned || expanded;
 
@@ -978,26 +1124,66 @@ function ConsumptionCard({
               示数记录
             </div>
             {logs.length >= 2 && (
-              <button
-                onClick={() => setShowChart((v) => !v)}
-                style={{
-                  fontSize: "11px", fontWeight: 600, color: "var(--lt-ink-3)",
-                  background: showChart ? "var(--lt-surface-2)" : "transparent",
-                  border: "none", borderRadius: "6px", padding: "2px 8px", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: "4px",
-                }}
-              >
-                <TrendingDown size={11} />{showChart ? "隐藏图表" : "查看趋势"}
-              </button>
+              <div style={{ display: "flex", gap: "4px" }}>
+                <button
+                  onClick={() => setChartView((v) => v === "trend" ? "none" : "trend")}
+                  style={{
+                    fontSize: "11px", fontWeight: 600, color: "var(--lt-ink-3)",
+                    background: chartView === "trend" ? "var(--lt-surface-2)" : "transparent",
+                    border: "none", borderRadius: "6px", padding: "2px 8px", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: "4px",
+                  }}
+                >
+                  <TrendingDown size={11} />趋势
+                </button>
+                <button
+                  onClick={() => setChartView((v) => v === "heatmap" ? "none" : "heatmap")}
+                  style={{
+                    fontSize: "11px", fontWeight: 600, color: "var(--lt-ink-3)",
+                    background: chartView === "heatmap" ? "var(--lt-surface-2)" : "transparent",
+                    border: "none", borderRadius: "6px", padding: "2px 8px", cursor: "pointer",
+                  }}
+                >
+                  热力图
+                </button>
+              </div>
             )}
           </div>
 
-          {showChart && logs.length >= 2 && (
-            <ConsumptionChart
-              logs={logs} unit={item.unit}
-              estimatedDays={item.estimatedDays}
+          {chartView === "trend" && logs.length >= 2 && (
+            <>
+              <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
+                {(["30", "90", "all"] as ChartRange[]).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setTimeRange(r)}
+                    style={{
+                      fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "6px",
+                      border: "none", cursor: "pointer",
+                      background: timeRange === r ? "var(--lt-ink-1)" : "var(--lt-track)",
+                      color: timeRange === r ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
+                      transition: "background 120ms ease-out",
+                    }}
+                  >
+                    {r === "all" ? "全部" : `近${r}天`}
+                  </button>
+                ))}
+              </div>
+              <ConsumptionChart
+                logs={logs} unit={item.unit}
+                estimatedDays={item.estimatedDays}
+                status={item.status}
+                chartId={String(item.id)}
+                timeRange={timeRange}
+              />
+            </>
+          )}
+
+          {chartView === "heatmap" && logs.length >= 2 && (
+            <ConsumptionHeatmap
+              logs={logs}
+              unit={item.unit}
               status={item.status}
-              chartId={String(item.id)}
             />
           )}
 
@@ -1620,6 +1806,81 @@ function EmptyState({ isSearch, tab }: { isSearch: boolean; tab: Tab }) {
   );
 }
 
+// ── usePushSubscription ───────────────────────────────────────────────────────
+
+function usePushSubscription(enabled: boolean) {
+  const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [supported, setSupported] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    setSupported(ok);
+    if (!ok) return;
+
+    // Check if already subscribed
+    navigator.serviceWorker.ready.then(async (reg) => {
+      const sub = await reg.pushManager.getSubscription();
+      setSubscribed(!!sub);
+    });
+  }, [enabled]);
+
+  const toggle = useCallback(async () => {
+    if (!supported || loading) return;
+    setLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+
+      if (subscribed) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        setSubscribed(false);
+        return;
+      }
+
+      // Request permission
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") return;
+
+      // Fetch VAPID public key
+      const res = await fetch("/api/push/subscribe");
+      const { enabled: pushEnabled, publicKey } = await res.json();
+      if (!pushEnabled || !publicKey) return;
+
+      // Subscribe
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: publicKey,
+      });
+
+      const json = sub.toJSON() as {
+        endpoint: string;
+        keys: { p256dh: string; auth: string };
+      };
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(json),
+      });
+      setSubscribed(true);
+    } catch (e) {
+      console.error("[push]", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [supported, subscribed, loading]);
+
+  return { subscribed, loading, supported, toggle };
+}
+
 // ── HomeContent ───────────────────────────────────────────────────────────────
 
 export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
@@ -1627,6 +1888,22 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
   const { data: session } = useSession();
   const user = isDemo ? null : session?.user;
   const isAdmin = user?.role === "admin";
+
+  // ── Theme ─────────────────────────────────────────────────────────────────
+  const { theme, toggle: toggleTheme } = useTheme();
+
+  // ── Service Worker registration ───────────────────────────────────────────
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((e) =>
+        console.warn("[sw]", e)
+      );
+    }
+  }, []);
+
+  // ── Push subscription (only in authenticated, non-demo mode) ──────────────
+  const { subscribed: pushSubscribed, loading: pushLoading, supported: pushSupported, toggle: togglePush }
+    = usePushSubscription(!isDemo && !!user);
 
   // ── Core state ────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>("deadline");
@@ -1927,7 +2204,48 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
               </div>
             )}
           </div>
-          <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
+          <div style={{ display: "flex", gap: "8px", marginTop: "2px", alignItems: "center" }}>
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+              style={{
+                width: "44px", height: "44px", borderRadius: "9999px",
+                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--lt-ink-3)",
+                transition: "transform 120ms ease-out",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
+            </button>
+
+            {/* Push notification toggle (authenticated + supported) */}
+            {!isDemo && user && pushSupported && (
+              <button
+                onClick={togglePush}
+                disabled={pushLoading}
+                title={pushSubscribed ? "关闭推送通知" : "开启推送通知"}
+                style={{
+                  width: "44px", height: "44px", borderRadius: "9999px",
+                  background: pushSubscribed ? "var(--lt-ink-1)" : "var(--lt-surface)",
+                  boxShadow: "var(--lt-card-shadow)",
+                  border: "none", cursor: pushLoading ? "default" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: pushSubscribed ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
+                  opacity: pushLoading ? 0.6 : 1,
+                  transition: "transform 120ms ease-out, background 180ms ease-out",
+                }}
+                onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.transform = "scale(1.07)"; }}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                {pushSubscribed ? <Bell size={18} strokeWidth={1.8} /> : <BellOff size={18} strokeWidth={1.8} />}
+              </button>
+            )}
+
             {!isDemo && (
               <Link href="/archived" style={{
                 width: "44px", height: "44px", borderRadius: "9999px",

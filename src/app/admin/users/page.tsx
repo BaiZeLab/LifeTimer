@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, RefreshCw, Copy, Check } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, RefreshCw, Copy, Check, Bell, Send, Users, User } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 interface UserRow {
@@ -22,20 +22,45 @@ interface InviteCode {
   used_by_email: string | null;
 }
 
+interface SubStat {
+  user_id: string;
+  name: string;
+  email: string;
+  sub_count: number;
+}
+
+interface BroadcastResult {
+  sent: number;
+  failed: number;
+  staleRemoved: number;
+  total: number;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+  const [subStats, setSubStats] = useState<SubStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Push broadcast state
+  const [pushTitle, setPushTitle] = useState("");
+  const [pushBody, setPushBody] = useState("");
+  const [pushUrl, setPushUrl] = useState("/");
+  const [pushTarget, setPushTarget] = useState<"all" | string>("all");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<BroadcastResult | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [usersRes, codesRes] = await Promise.all([
+      const [usersRes, codesRes, subsRes] = await Promise.all([
         authClient.admin.listUsers({ query: { limit: 100 } }),
         fetch("/api/admin/invite-codes"),
+        fetch("/api/admin/push"),
       ]);
       if (usersRes.error) throw new Error(usersRes.error.message ?? "Failed to load users");
       const rawUsers = (usersRes.data?.users ?? []) as unknown as Array<{
@@ -47,6 +72,7 @@ export default function AdminUsersPage() {
         banned: u.banned ?? null,
       })));
       if (codesRes.ok) setInviteCodes(await codesRes.json());
+      if (subsRes.ok) setSubStats(await subsRes.json());
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -70,6 +96,37 @@ export default function AdminUsersPage() {
     await navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2000);
+  }
+
+  async function sendBroadcast() {
+    if (!pushTitle.trim() || !pushBody.trim()) return;
+    setSending(true);
+    setSendResult(null);
+    setSendError(null);
+    try {
+      const res = await fetch("/api/admin/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: pushTitle.trim(),
+          body:  pushBody.trim(),
+          url:   pushUrl.trim() || "/",
+          userIds: pushTarget === "all" ? undefined : [pushTarget],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendError(data.error ?? "发送失败");
+      } else {
+        setSendResult(data as BroadcastResult);
+        setPushTitle("");
+        setPushBody("");
+      }
+    } catch (e) {
+      setSendError((e as Error).message);
+    } finally {
+      setSending(false);
+    }
   }
 
   async function toggleBan(user: UserRow) {
@@ -163,6 +220,175 @@ export default function AdminUsersPage() {
             </table>
           </div>
         )}
+      </section>
+
+      {/* ── Push Broadcast ── */}
+      <section style={{ marginBottom: "40px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+          <Bell size={15} strokeWidth={1.8} style={{ color: "var(--lt-ink-3)" }} />
+          <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
+            发送推送通知
+          </h2>
+          {subStats.length > 0 && (
+            <span style={{
+              fontSize: "0.75rem", color: "var(--lt-ink-4)",
+              background: "var(--lt-surface-2)", borderRadius: "9999px",
+              padding: "2px 8px",
+            }}>
+              {subStats.reduce((s, r) => s + r.sub_count, 0)} 个订阅 · {subStats.length} 人
+            </span>
+          )}
+        </div>
+
+        <div style={{
+          background: "var(--lt-surface)", borderRadius: "12px",
+          border: "1px solid var(--lt-border-muted)", padding: "20px",
+          display: "flex", flexDirection: "column", gap: "14px",
+        }}>
+          {/* Target selector */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
+              发送对象
+            </label>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <button
+                onClick={() => setPushTarget("all")}
+                style={{
+                  display: "flex", alignItems: "center", gap: "5px",
+                  padding: "6px 12px", borderRadius: "8px",
+                  border: `1.5px solid ${pushTarget === "all" ? "var(--lt-ink-1)" : "var(--lt-border)"}`,
+                  background: pushTarget === "all" ? "var(--lt-ink-1)" : "transparent",
+                  color: pushTarget === "all" ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
+                  fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer",
+                  transition: "all 150ms ease-out",
+                }}
+              >
+                <Users size={13} strokeWidth={2} />
+                全部用户 ({subStats.reduce((s, r) => s + r.sub_count, 0)} 订阅)
+              </button>
+              {subStats.map((stat) => (
+                <button
+                  key={stat.user_id}
+                  onClick={() => setPushTarget(stat.user_id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "5px",
+                    padding: "6px 12px", borderRadius: "8px",
+                    border: `1.5px solid ${pushTarget === stat.user_id ? "var(--lt-ink-1)" : "var(--lt-border)"}`,
+                    background: pushTarget === stat.user_id ? "var(--lt-ink-1)" : "transparent",
+                    color: pushTarget === stat.user_id ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
+                    fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer",
+                    transition: "all 150ms ease-out",
+                  }}
+                >
+                  <User size={13} strokeWidth={2} />
+                  {stat.name}
+                  <span style={{
+                    fontSize: "0.7rem", opacity: 0.7,
+                    background: pushTarget === stat.user_id
+                      ? "oklch(100% 0 0 / 0.15)"
+                      : "var(--lt-surface-2)",
+                    padding: "1px 5px", borderRadius: "9999px",
+                  }}>
+                    {stat.sub_count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {subStats.length === 0 && !loading && (
+              <p style={{ fontSize: "0.8125rem", color: "var(--lt-ink-4)", fontStyle: "italic" }}>
+                暂无用户订阅推送。用户需在主页点击铃铛图标授权后才会出现。
+              </p>
+            )}
+          </div>
+
+          {/* Title */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
+              标题
+            </label>
+            <input
+              className="lt-auth-input"
+              value={pushTitle}
+              onChange={(e) => setPushTitle(e.target.value)}
+              placeholder="如：Life Timer 公告"
+              maxLength={64}
+            />
+          </div>
+
+          {/* Body */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
+              内容
+            </label>
+            <textarea
+              className="lt-textarea"
+              value={pushBody}
+              onChange={(e) => setPushBody(e.target.value)}
+              placeholder="通知正文，建议简短（80 字以内）"
+              maxLength={200}
+              style={{ minHeight: "72px", fontSize: "0.9375rem" }}
+            />
+            <div style={{ fontSize: "0.75rem", color: "var(--lt-ink-4)", textAlign: "right" }}>
+              {pushBody.length} / 200
+            </div>
+          </div>
+
+          {/* URL */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <label style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--lt-ink-3)" }}>
+              点击跳转地址（可选，默认 /）
+            </label>
+            <input
+              className="lt-auth-input"
+              value={pushUrl}
+              onChange={(e) => setPushUrl(e.target.value)}
+              placeholder="/"
+            />
+          </div>
+
+          {/* Result / Error feedback */}
+          {sendResult && (
+            <div style={{
+              padding: "10px 14px", borderRadius: "8px",
+              background: "oklch(from var(--lt-ok) l c h / 0.10)",
+              border: "1px solid oklch(from var(--lt-ok) l c h / 0.30)",
+              fontSize: "0.875rem", color: "var(--lt-ink-2)",
+              display: "flex", gap: "16px",
+            }}>
+              <span>✓ 成功发送 <strong>{sendResult.sent}</strong></span>
+              {sendResult.failed > 0 && <span style={{ color: "var(--lt-danger)" }}>失败 {sendResult.failed}</span>}
+              {sendResult.staleRemoved > 0 && <span style={{ color: "var(--lt-ink-4)" }}>清理过期订阅 {sendResult.staleRemoved}</span>}
+            </div>
+          )}
+          {sendError && (
+            <div style={{
+              padding: "10px 14px", borderRadius: "8px",
+              background: "var(--lt-danger-hover-bg)",
+              fontSize: "0.875rem", color: "var(--lt-danger)",
+            }}>
+              {sendError}
+            </div>
+          )}
+
+          {/* Send button */}
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={sendBroadcast}
+              disabled={sending || !pushTitle.trim() || !pushBody.trim() || subStats.length === 0}
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "9px 20px", border: "none", borderRadius: "10px",
+                background: "var(--lt-ink-1)", color: "var(--lt-on-ink)",
+                fontSize: "0.875rem", fontWeight: 600, cursor: "pointer",
+                opacity: (sending || !pushTitle.trim() || !pushBody.trim() || subStats.length === 0) ? 0.45 : 1,
+                transition: "opacity 150ms ease-out",
+              }}
+            >
+              <Send size={14} strokeWidth={2} />
+              {sending ? "发送中…" : "立即推送"}
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* ── Invite Codes ── */}

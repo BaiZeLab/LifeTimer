@@ -11,9 +11,10 @@
  *   incoming requests when this is absent.
  */
 
-const fs = require("fs");
+const fs     = require("fs");
 const crypto = require("crypto");
-const path = require("path");
+const path   = require("path");
+const http   = require("http");
 
 const SECRET_FILE = path.join("/app/data", "auth-secret");
 
@@ -47,4 +48,75 @@ function ensureAuthSecret() {
 
 ensureAuthSecret();
 
+// ── Icons generation (PWA) ────────────────────────────────────────────────────
+
+function generateIcons() {
+  try {
+    require(path.join(__dirname, "scripts", "generate-icons.js"));
+    console.log("[startup] PWA icons generated");
+  } catch (e) {
+    console.warn("[startup] Could not generate PWA icons:", e.message);
+  }
+}
+
+generateIcons();
+
+// ── Start Next.js standalone server ──────────────────────────────────────────
+
 require("./server.js");
+
+// ── Cron scheduler ────────────────────────────────────────────────────────────
+
+const PORT     = process.env.PORT     || 3000;
+const HOSTNAME = process.env.HOSTNAME || "localhost";
+const SECRET   = process.env.CRON_SECRET || "";
+
+const POLL_URL = `http://${HOSTNAME}:${PORT}/`;
+const CRON_URL = `http://${HOSTNAME}:${PORT}/api/cron`;
+const CRON_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+function executeCronJob() {
+  const headers = SECRET ? { "x-cron-secret": SECRET } : {};
+  const options = {
+    hostname: HOSTNAME,
+    port:     PORT,
+    path:     "/api/cron",
+    method:   "GET",
+    headers,
+    timeout:  30000,
+  };
+
+  const req = http.request(options, (res) => {
+    let data = "";
+    res.on("data", (chunk) => { data += chunk; });
+    res.on("end", () => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        console.log("[cron] Job executed:", data.slice(0, 200));
+      } else {
+        console.error("[cron] Job failed:", res.statusCode, data.slice(0, 200));
+      }
+    });
+  });
+
+  req.on("error", (err) => console.error("[cron] Error:", err.message));
+  req.on("timeout", () => { console.error("[cron] Timeout"); req.destroy(); });
+  req.end();
+}
+
+// Poll until server is ready, then start cron
+const pollId = setInterval(() => {
+  const req = http.get(POLL_URL, (res) => {
+    if (res.statusCode >= 200 && res.statusCode < 400) {
+      console.log("[startup] Server is ready — starting cron scheduler");
+      clearInterval(pollId);
+
+      // First run immediately (with a small delay to let DB migrations finish)
+      setTimeout(executeCronJob, 5000);
+
+      // Then every hour
+      setInterval(executeCronJob, CRON_INTERVAL_MS);
+    }
+  });
+  req.setTimeout(2000, () => req.destroy());
+  req.on("error", () => {}); // ignore connection-refused during startup
+}, 1000);
