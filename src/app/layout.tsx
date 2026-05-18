@@ -21,6 +21,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Life Timer",
   },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 /** Inline script injected into <head> to prevent flash-of-wrong-theme. */
@@ -36,19 +43,9 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        {/* Anti-FOUC: set theme class before first paint */}
+        {/* Anti-FOUC: set theme class before first paint. Must stay here — metadata API cannot inject inline scripts. */}
         {/* eslint-disable-next-line react/no-danger */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-
-        {/* PWA — Apple */}
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Life Timer" />
-
-        {/* PWA — General */}
-        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>

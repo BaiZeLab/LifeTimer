@@ -68,8 +68,11 @@ self.addEventListener("fetch", (event) => {
       caches.match(request).then((cached) =>
         cached ||
         fetch(request).then((res) => {
-          const clone = res.clone();
-          caches.open(STATIC_CACHE).then((c) => c.put(request, clone));
+          // Only cache successful responses — never cache 4xx/5xx or redirects
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(STATIC_CACHE).then((c) => c.put(request, clone));
+          }
           return res;
         })
       )
@@ -78,11 +81,16 @@ self.addEventListener("fetch", (event) => {
   }
 
   // HTML pages — network first, fall back to cache
+  // Only cache 200 responses; auth redirects (302→/auth/login) must never be
+  // cached, otherwise a logged-out user's redirect would be served to a
+  // subsequently logged-in user in offline mode.
   event.respondWith(
     fetch(request)
       .then((res) => {
-        const clone = res.clone();
-        caches.open(STATIC_CACHE).then((c) => c.put(request, clone));
+        if (res.status === 200) {
+          const clone = res.clone();
+          caches.open(STATIC_CACHE).then((c) => c.put(request, clone));
+        }
         return res;
       })
       .catch(() => caches.match(request))

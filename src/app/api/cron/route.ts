@@ -13,19 +13,41 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual, createHash } from "crypto";
 import sql from "@/lib/db";
 import { sendPush, isPushEnabled, initWebPush } from "@/lib/push";
 import { getDeadlineItems, getConsumptionItems } from "@/lib/items-query";
 
 const DEDUP_HOURS = 20;
 
+/** Constant-time string comparison to prevent timing-based secret leakage. */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return ha.length === hb.length && timingSafeEqual(ha, hb);
+}
+
 export async function GET(req: NextRequest) {
   // ── Auth check ──────────────────────────────────────────────────────────
   const secret = process.env.CRON_SECRET;
+  const provided = req.headers.get("x-cron-secret");
+
   if (secret) {
-    const provided = req.headers.get("x-cron-secret");
-    if (provided !== secret) {
+    // Secret configured → always require it (constant-time compare avoids timing attacks)
+    if (!provided || !timingSafeEqualStr(provided, secret)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else {
+    // No secret → only accept calls from loopback (Docker-internal start.js).
+    // x-forwarded-for is absent on direct loopback connections; if present the
+    // request came through a proxy / the public internet → block it.
+    const forwarded = req.headers.get("x-forwarded-for");
+    const realIp    = req.headers.get("x-real-ip");
+    const ip        = forwarded ?? realIp ?? "";
+    const isLoop    = ip === "" || ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+    if (!isLoop) {
+      console.warn("[cron] Blocked unauthenticated request from", ip, "— set CRON_SECRET to enable external access");
+      return NextResponse.json({ error: "Forbidden — CRON_SECRET not configured" }, { status: 403 });
     }
   }
 
@@ -56,10 +78,13 @@ export async function GET(req: NextRequest) {
     if (subs.length === 0) continue;
 
     // Get recently-alerted item IDs for this user
+    // Use multiplication so the integer parameter is outside the string literal.
+    // INTERVAL '${n} hours' embeds $n inside a quoted literal which PostgreSQL
+    // cannot parameterise; (n * INTERVAL '1 hour') is the correct form.
     const recentRows = await sql`
       SELECT item_id FROM push_log
       WHERE user_id = ${user_id}
-        AND sent_at > NOW() - INTERVAL '${DEDUP_HOURS} hours'
+        AND sent_at > NOW() - (${DEDUP_HOURS} * INTERVAL '1 hour')
     ` as { item_id: number }[];
     const recentIds = new Set(recentRows.map((r) => r.item_id));
 

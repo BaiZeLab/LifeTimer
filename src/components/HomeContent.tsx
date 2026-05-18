@@ -1806,6 +1806,22 @@ function EmptyState({ isSearch, tab }: { isSearch: boolean; tab: Tab }) {
   );
 }
 
+// ── Push helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Convert a base64url-encoded VAPID public key to a Uint8Array.
+ * The Web Push spec requires a BufferSource for applicationServerKey;
+ * passing a raw string works in Chrome 67+ but fails in older/non-Chrome engines.
+ */
+function urlBase64ToUint8Array(base64: string): ArrayBuffer {
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64    = padded.replace(/-/g, "+").replace(/_/g, "/");
+  const raw    = atob(b64);
+  const arr    = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr.buffer;
+}
+
 // ── usePushSubscription ───────────────────────────────────────────────────────
 
 function usePushSubscription(enabled: boolean) {
@@ -1855,10 +1871,10 @@ function usePushSubscription(enabled: boolean) {
       const { enabled: pushEnabled, publicKey } = await res.json();
       if (!pushEnabled || !publicKey) return;
 
-      // Subscribe
+      // Subscribe — convert to Uint8Array for maximum browser compatibility
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: publicKey,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
       const json = sub.toJSON() as {

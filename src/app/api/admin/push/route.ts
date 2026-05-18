@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "title and body are required" }, { status: 400 });
   }
 
+  // url must be a relative path to prevent open-redirect / phishing via push
+  const rawUrl = body.url?.trim() ?? "/";
+  if (rawUrl && !rawUrl.startsWith("/")) {
+    return NextResponse.json({ error: "url must be a relative path (start with /)" }, { status: 400 });
+  }
+  const safeUrl = rawUrl || "/";
+
   initWebPush();
 
   // ── Fetch subscriptions ─────────────────────────────────────────────────
@@ -66,7 +73,7 @@ export async function POST(req: NextRequest) {
   const payload = {
     title,
     body:  text,
-    url:   body.url ?? "/",
+    url:   safeUrl,
     tag:   "lt-admin-broadcast",
   };
 
