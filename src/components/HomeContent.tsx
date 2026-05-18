@@ -1825,12 +1825,27 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
 // ── usePushSubscription ───────────────────────────────────────────────────────
 
 function usePushSubscription(enabled: boolean) {
-  const [subscribed, setSubscribed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [supported, setSupported] = useState(false);
+  const [subscribed,   setSubscribed]   = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [supported,    setSupported]    = useState(false);
+  // True when on iOS Safari in browser mode (not installed as PWA)
+  const [iosNeedsPWA,  setIosNeedsPWA]  = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
+
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window as { MSStream?: unknown }).MSStream;
+    const isStandalone =
+      (navigator as { standalone?: boolean }).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches;
+
+    // On iOS, Web Push only works from an installed PWA (Home Screen icon).
+    // Show a hint instead of an unusable button when in browser mode.
+    if (isIos && !isStandalone) {
+      setIosNeedsPWA(true);
+      return;
+    }
+
     const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
     setSupported(ok);
     if (!ok) return;
@@ -1894,7 +1909,7 @@ function usePushSubscription(enabled: boolean) {
     }
   }, [supported, subscribed, loading]);
 
-  return { subscribed, loading, supported, toggle };
+  return { subscribed, loading, supported, iosNeedsPWA, toggle };
 }
 
 // ── HomeContent ───────────────────────────────────────────────────────────────
@@ -1918,7 +1933,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
   }, []);
 
   // ── Push subscription (only in authenticated, non-demo mode) ──────────────
-  const { subscribed: pushSubscribed, loading: pushLoading, supported: pushSupported, toggle: togglePush }
+  const { subscribed: pushSubscribed, loading: pushLoading, supported: pushSupported, iosNeedsPWA, toggle: togglePush }
     = usePushSubscription(!isDemo && !!user);
 
   // ── Core state ────────────────────────────────────────────────────────────
@@ -2259,6 +2274,23 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
                 onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 {pushSubscribed ? <Bell size={18} strokeWidth={1.8} /> : <BellOff size={18} strokeWidth={1.8} />}
+              </button>
+            )}
+
+            {/* iOS Safari hint: push requires PWA (Home Screen) mode */}
+            {!isDemo && user && iosNeedsPWA && (
+              <button
+                title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
+                style={{
+                  width: "44px", height: "44px", borderRadius: "9999px",
+                  background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                  border: "1.5px dashed var(--lt-border)", cursor: "default",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--lt-ink-4)",
+                }}
+                onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
+              >
+                <BellOff size={18} strokeWidth={1.5} />
               </button>
             )}
 

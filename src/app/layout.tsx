@@ -46,6 +46,15 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
         {/* Anti-FOUC: set theme class before first paint. Must stay here — metadata API cannot inject inline scripts. */}
         {/* eslint-disable-next-line react/no-danger */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+
+        {/*
+          iOS standalone mode (full-screen from Home Screen).
+          Next.js appleWebApp.capable generates "mobile-web-app-capable" (Android/Chrome standard)
+          but NOT "apple-mobile-web-app-capable" — the latter is required by iOS < 16.4.
+          iOS 16.4+ can read display:"standalone" from manifest.json directly, so this
+          tag is the compat shim for older devices. It is NOT a duplicate of mobile-web-app-capable.
+        */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>

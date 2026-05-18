@@ -12,11 +12,12 @@ export function isPushEnabled(): boolean {
 /** Must be called once before any sendPush() call. Safe to call multiple times. */
 export function initWebPush() {
   if (!isPushEnabled()) return;
-  webpush.setVapidDetails(
-    `mailto:${process.env.VAPID_EMAIL}`,
-    process.env.VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!
-  );
+  const email = process.env.VAPID_EMAIL!;
+  // Accept either "mailto:user@example.com" or bare "user@example.com"
+  const subject = email.startsWith("mailto:") || email.startsWith("https://")
+    ? email
+    : `mailto:${email}`;
+  webpush.setVapidDetails(subject, process.env.VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
 }
 
 export interface PushSubscriptionKeys {
