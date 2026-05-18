@@ -54,11 +54,18 @@ const BETTER_AUTH_PREFIX = "/api/auth/";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Static assets — always pass through
+  // Static assets and PWA resources — always pass through without auth.
+  // These must be publicly accessible: iOS/Android read manifest.json and icons
+  // during "Add to Home Screen" without a session cookie.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname === "/favicon.svg"
+    pathname === "/favicon.svg" ||
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json" ||       // PWA manifest — required for standalone mode
+    pathname === "/sw.js" ||               // Service Worker — required for push & offline
+    pathname.startsWith("/icons/") ||      // PWA icons — required for home screen icon
+    pathname.startsWith("/api/push/")      // VAPID public key endpoint (needed before login)
   ) {
     return NextResponse.next();
   }
