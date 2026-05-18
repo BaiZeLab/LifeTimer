@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, RefreshCw, Copy, Check, Bell, Send, Users, User } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, RefreshCw, Copy, Check, Bell, Send, Users, User, Monitor } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 interface UserRow {
@@ -36,10 +36,32 @@ interface BroadcastResult {
   total: number;
 }
 
+interface PwaDiagRow {
+  id: number;
+  user_agent: string | null;
+  is_ios: boolean | null;
+  ios_version: string | null;
+  is_android: boolean | null;
+  is_standalone: boolean | null;
+  is_https: boolean | null;
+  sw_supported: boolean | null;
+  sw_registered: boolean | null;
+  notif_supported: boolean | null;
+  notif_perm: string | null;
+  push_supported: boolean | null;
+  manifest_ok: boolean | null;
+  icon192_ok: boolean | null;
+  apple_icon_ok: boolean | null;
+  apple_icon_mime: string | null;
+  apple_icon_url: string | null;
+  submitted_at: string;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [subStats, setSubStats] = useState<SubStat[]>([]);
+  const [pwaDiags, setPwaDiags] = useState<PwaDiagRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +79,11 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [usersRes, codesRes, subsRes] = await Promise.all([
+      const [usersRes, codesRes, subsRes, diagsRes] = await Promise.all([
         authClient.admin.listUsers({ query: { limit: 100 } }),
         fetch("/api/admin/invite-codes"),
         fetch("/api/admin/push"),
+        fetch("/api/pwa-check"),
       ]);
       if (usersRes.error) throw new Error(usersRes.error.message ?? "Failed to load users");
       const rawUsers = (usersRes.data?.users ?? []) as unknown as Array<{
@@ -73,6 +96,10 @@ export default function AdminUsersPage() {
       })));
       if (codesRes.ok) setInviteCodes(await codesRes.json());
       if (subsRes.ok) setSubStats(await subsRes.json());
+      if (diagsRes.ok) {
+        const d = await diagsRes.json() as { rows: PwaDiagRow[] };
+        setPwaDiags(d.rows ?? []);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -389,6 +416,136 @@ export default function AdminUsersPage() {
             </button>
           </div>
         </div>
+      </section>
+
+      {/* ── PWA Diagnostics ── */}
+      <section style={{ marginBottom: "40px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+          <Monitor size={15} strokeWidth={1.8} style={{ color: "var(--lt-ink-3)" }} />
+          <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
+            PWA 诊断日志
+          </h2>
+          <a
+            href="/pwa-check"
+            target="_blank"
+            rel="noopener"
+            style={{
+              fontSize: "0.75rem", color: "var(--lt-ink-4)",
+              background: "var(--lt-surface-2)", borderRadius: "9999px",
+              padding: "2px 8px", textDecoration: "none",
+            }}
+          >
+            诊断页面 ↗
+          </a>
+        </div>
+
+        {pwaDiags.length === 0 ? (
+          <div style={{
+            background: "var(--lt-surface)", borderRadius: "12px",
+            border: "1px solid var(--lt-border-muted)",
+            padding: "20px 16px", color: "var(--lt-ink-3)",
+            fontSize: "0.875rem", textAlign: "center",
+          }}>
+            暂无诊断记录。让用户访问{" "}
+            <a href="/pwa-check" target="_blank" rel="noopener" style={{ color: "var(--lt-ink-2)", textDecoration: "underline" }}>
+              /pwa-check
+            </a>{" "}
+            并点击"发送报告给管理员"。
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {pwaDiags.map((d) => {
+              const issues: string[] = [];
+              if (!d.is_https) issues.push("非 HTTPS");
+              if (!d.manifest_ok) issues.push("manifest 失败");
+              if (!d.icon192_ok) issues.push("icon-192 失败");
+              if (!d.apple_icon_ok)
+                issues.push(
+                  d.apple_icon_mime?.includes("html")
+                    ? `apple-icon 重定向到登录页 (CF缓存307)`
+                    : "apple-icon 失败"
+                );
+              if (!d.sw_registered && d.sw_supported) issues.push("SW 未注册");
+              if (d.is_ios && !d.is_standalone) issues.push("非独立模式");
+              if (d.is_ios && !d.push_supported) issues.push("iOS Push 不可用");
+
+              const ok = (v: boolean | null) =>
+                v === null ? "?" : v ? "✅" : "❌";
+
+              const platform = d.is_ios
+                ? `iOS ${d.ios_version ?? ""}`
+                : d.is_android
+                ? "Android"
+                : "Desktop";
+
+              return (
+                <div
+                  key={d.id}
+                  style={{
+                    background: "var(--lt-surface)", borderRadius: "12px",
+                    border: `1px solid ${issues.length > 0 ? "oklch(from var(--lt-danger) l c h / 0.30)" : "var(--lt-border-muted)"}`,
+                    padding: "14px 16px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
+                        {platform}
+                      </span>
+                      {d.is_standalone && (
+                        <span style={{ fontSize: "0.7rem", color: "var(--lt-ok)", background: "oklch(from var(--lt-ok) l c h / 0.10)", padding: "1px 6px", borderRadius: "9999px" }}>
+                          独立模式
+                        </span>
+                      )}
+                      {issues.length === 0 && (
+                        <span style={{ fontSize: "0.7rem", color: "var(--lt-ok)" }}>全部通过</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "var(--lt-ink-4)", whiteSpace: "nowrap" }}>
+                      {new Date(d.submitted_at).toLocaleString("zh-CN")}
+                    </span>
+                  </div>
+
+                  {issues.length > 0 && (
+                    <div style={{ marginBottom: "8px" }}>
+                      {issues.map((issue, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            display: "inline-block", marginRight: "6px", marginBottom: "4px",
+                            fontSize: "0.75rem", color: "var(--lt-danger)",
+                            background: "var(--lt-danger-hover-bg)",
+                            padding: "2px 7px", borderRadius: "9999px",
+                          }}
+                        >
+                          {issue}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", fontSize: "0.75rem", color: "var(--lt-ink-3)" }}>
+                    <span>manifest {ok(d.manifest_ok)}</span>
+                    <span>icon-192 {ok(d.icon192_ok)}</span>
+                    <span>apple-icon {ok(d.apple_icon_ok)}</span>
+                    <span>SW {ok(d.sw_registered)}</span>
+                    <span>Push {ok(d.push_supported)}</span>
+                    <span>通知 {d.notif_perm ?? "?"}</span>
+                  </div>
+
+                  {d.user_agent && (
+                    <p style={{
+                      marginTop: "6px", fontSize: "0.7rem", color: "var(--lt-ink-4)",
+                      wordBreak: "break-all",
+                    }}>
+                      {d.user_agent.slice(0, 120)}{d.user_agent.length > 120 ? "…" : ""}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* ── Invite Codes ── */}

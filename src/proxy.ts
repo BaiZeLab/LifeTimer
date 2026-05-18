@@ -65,7 +65,9 @@ export async function proxy(request: NextRequest) {
     pathname === "/manifest.json" ||       // PWA manifest — required for standalone mode
     pathname === "/sw.js" ||               // Service Worker — required for push & offline
     pathname.startsWith("/icons/") ||      // PWA icons — required for home screen icon
-    pathname.startsWith("/api/push/")      // VAPID public key endpoint (needed before login)
+    pathname.startsWith("/api/push/") ||    // VAPID public key endpoint (needed before login)
+    pathname === "/pwa-check" ||            // Public PWA diagnostics page
+    pathname === "/api/pwa-check"           // Diagnostics report collector (unauthenticated POST)
   ) {
     return NextResponse.next();
   }

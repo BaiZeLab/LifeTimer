@@ -255,4 +255,35 @@ export async function migrate(): Promise<void> {
   `;
 
   await sql`CREATE INDEX IF NOT EXISTS idx_push_log_user_item ON push_log(user_id, item_id, sent_at)`;
+
+  // ── PWA diagnostics log ───────────────────────────────────────────────────
+  // Stores client-side diagnostic reports submitted from /pwa-check page.
+  // No user_id FK because the page is public (user may not be logged in).
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS pwa_diagnostics (
+      id              SERIAL      PRIMARY KEY,
+      user_agent      TEXT,
+      is_ios          BOOLEAN,
+      ios_version     TEXT,
+      is_android      BOOLEAN,
+      is_standalone   BOOLEAN,
+      sw_supported    BOOLEAN,
+      sw_registered   BOOLEAN,
+      notif_supported BOOLEAN,
+      notif_perm      TEXT,
+      push_supported  BOOLEAN,
+      manifest_ok     BOOLEAN,
+      manifest_mime   TEXT,
+      icon192_ok      BOOLEAN,
+      apple_icon_ok   BOOLEAN,
+      apple_icon_mime TEXT,
+      apple_icon_url  TEXT,
+      is_https        BOOLEAN,
+      raw_data        JSONB,
+      submitted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_pwa_diag_time ON pwa_diagnostics(submitted_at DESC)`;
 }
