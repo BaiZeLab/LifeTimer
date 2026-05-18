@@ -69,7 +69,19 @@ export async function proxy(request: NextRequest) {
     pathname === "/pwa-check" ||            // Public PWA diagnostics page
     pathname === "/api/pwa-check"           // Diagnostics report collector (unauthenticated POST)
   ) {
-    return NextResponse.next();
+    // Prevent Safari (especially iOS) from caching 307 redirects for PWA-critical resources.
+    // Without this, a prior redirect response can get stuck in the browser's HTTP cache,
+    // causing manifest.json and icons to appear broken even after the server is fixed.
+    const res = NextResponse.next();
+    if (
+      pathname === "/manifest.json" ||
+      pathname === "/sw.js" ||
+      pathname.startsWith("/icons/")
+    ) {
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.headers.set("Pragma", "no-cache");
+    }
+    return res;
   }
 
   // Block direct sign-up endpoint — must go through /api/auth/register (invite code)
