@@ -1,6 +1,6 @@
 # Life Timer
 
-一款移动优先的生活倒计时管理工具，帮助你追踪各类物品/服务的到期时间，以及消耗品的预估剩余天数。
+一款移动优先的生活倒计时管理工具，帮助你追踪各类物品/服务的到期时间，以及消耗品的预估剩余天数。支持 PWA 安装、Web Push 推送通知、深色/浅色主题切换。
 
 ---
 
@@ -10,12 +10,12 @@
 |------|------|------|
 | 框架 | [Next.js](https://nextjs.org) (App Router) | 16.x |
 | UI 库 | [React](https://react.dev) | 19.x |
-| 组件库 | [Ant Design](https://ant.design) → 规划迁移 [shadcn/ui](https://ui.shadcn.com) | 6.x |
-| 样式 | [Tailwind CSS](https://tailwindcss.com) | v4 |
+| 样式 | CSS Variables + Tailwind CSS | v4 |
 | 语言 | TypeScript | 5.x |
-| 数据库 | [Neon](https://neon.tech) Serverless PostgreSQL（云端） | — |
-| 部署 | Docker + 环境变量注入数据库连接串 | — |
-| 编译优化 | React Compiler（自动 memoization） | — |
+| 认证 | [better-auth](https://www.better-auth.com) | — |
+| 数据库 | [Neon](https://neon.tech) Serverless PostgreSQL | — |
+| 推送 | [web-push](https://github.com/web-push-libs/web-push) (VAPID) | — |
+| 部署 | Docker standalone + Node.js 自定义启动脚本 | — |
 
 ---
 
@@ -24,15 +24,34 @@
 ```
 src/
 ├── app/
-│   ├── layout.tsx          # 根布局
-│   ├── page.tsx            # 首页（分组列表）
-│   ├── api/                # Next.js API Routes（数据库操作）
-│   └── globals.css
-├── components/             # 可复用组件
+│   ├── layout.tsx              # 根布局（PWA metadata、主题、anti-FOUC）
+│   ├── page.tsx                # 首页（分组列表）
+│   ├── demo/                   # 无需登录的演示模式
+│   ├── archived/               # 归档列表
+│   ├── pwa-check/              # PWA 诊断页（公开，无需登录）
+│   ├── auth/                   # 登录 / 注册 / 初始化
+│   ├── admin/users/            # 管理员面板（用户、邀请码、推送、诊断）
+│   └── api/
+│       ├── items/              # 条目 CRUD + 续期 + 示数日志
+│       ├── tags/               # 标签管理
+│       ├── auth/               # 注册（邀请码）/ 初始化
+│       ├── push/subscribe/     # Web Push 订阅管理
+│       ├── admin/push/         # 管理员主动推送
+│       ├── pwa-check/          # PWA 诊断数据收集（公开 POST / Admin GET）
+│       └── cron/               # 定时推送任务（需 CRON_SECRET 或本机调用）
+├── components/                 # 可复用 UI 组件
 ├── lib/
-│   ├── db.ts               # Neon 数据库连接
-│   └── algorithms.ts       # 消耗速率算法
-└── styles/
+│   ├── db.ts                   # Neon 数据库连接
+│   ├── push.ts                 # Web Push 工具函数（initWebPush / sendPush）
+│   ├── schema.ts               # 数据库迁移（自动运行）
+│   └── algorithms.ts           # 消耗速率加权算法
+public/
+├── manifest.json               # PWA Manifest
+├── sw.js                       # Service Worker（缓存策略 + Push 处理）
+└── icons/                      # PWA 图标（构建时自动生成）
+scripts/
+└── generate-icons.js           # 纯 Node.js PNG 图标生成脚本
+start.js                        # Docker 自定义启动脚本（服务就绪检测 + Cron 调度）
 ```
 
 ---
@@ -43,10 +62,13 @@ src/
 # 1. 安装依赖
 npm install
 
-# 2. 配置数据库连接（复制后填入你的 Neon 连接串）
-cp .env.local.example .env.local   # 或手动创建 .env.local
+# 2. 配置环境变量（参见下方"环境变量"章节）
+cp .env.local.example .env.local   # 或手动创建
 
-# 3. 启动开发服务器
+# 3. 生成 PWA 图标
+node scripts/generate-icons.js
+
+# 4. 启动开发服务器
 npm run dev
 ```
 
@@ -56,171 +78,172 @@ npm run dev
 
 ## 环境变量
 
-| 变量 | 说明 |
-|------|------|
-| `DATABASE_URL` | Neon PostgreSQL 连接串（`postgresql://...`） |
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `DATABASE_URL` | ✅ | Neon PostgreSQL 连接串（`postgresql://...`） |
+| `BETTER_AUTH_SECRET` | ✅ | 随机字符串，用于 Session 签名（至少 32 字节） |
+| `BETTER_AUTH_URL` | ✅ | 应用完整 URL，如 `https://clock.example.com`（生产）或 `http://localhost:3000`（开发） |
+| `VAPID_PUBLIC_KEY` | 推送可选 | VAPID 公钥（base64url）|
+| `VAPID_PRIVATE_KEY` | 推送可选 | VAPID 私钥（base64url）|
+| `VAPID_EMAIL` | 推送可选 | 联系邮箱，格式 `mailto:you@example.com` 或 `you@example.com`（会自动加前缀）|
+| `CRON_SECRET` | 推送可选 | Cron 接口鉴权密钥；未设置时仅允许本机调用 |
+
+**生成 VAPID 密钥（一次性）：**
+
+```bash
+node -e "const wp=require('web-push'); const k=wp.generateVAPIDKeys(); console.log('VAPID_PUBLIC_KEY='+k.publicKey+'\nVAPID_PRIVATE_KEY='+k.privateKey);"
+```
 
 ---
 
 ## 部署
 
+### Docker
+
 ```bash
-# 构建并启动（DATABASE_URL 通过 .env.local 注入）
-docker compose up --build -d
+# 构建镜像
+docker build -t life-timer .
+
+# 启动容器（注入生产环境变量）
+docker run -d \
+  -p 3000:3000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e BETTER_AUTH_SECRET="..." \
+  -e BETTER_AUTH_URL="https://clock.example.com" \
+  -e VAPID_PUBLIC_KEY="..." \
+  -e VAPID_PRIVATE_KEY="..." \
+  -e VAPID_EMAIL="mailto:you@example.com" \
+  -e CRON_SECRET="..." \
+  life-timer
 ```
 
----
-
-## 产品需求
-
-### 视觉设计原则
-
-**倒计时进度条（Drain Bar）**：进度条从满格开始向左消耗，而非从零开始向右增长。
-- 视觉直觉：满格 = 充裕，空格 = 危险，和「电量」的感知一致
-- 配色随剩余量渐变：`绿色（充裕）→ 黄色（预警）→ 红色（危急/耗尽）`
-- 适用于 Deadline 和 Consumption 两种类型
+`start.js` 会在服务就绪后自动启动每小时一次的 Cron 任务（扫描即将到期/耗尽条目并发送 Push 通知）。
 
 ---
 
-### 首页布局
+## PWA 支持
 
-两个独立分组，分别展示：
+### 安装条件
 
-```
-┌─────────────────────────┐
-│ 🔔 即将到期提醒           │  ← Deadline 分组
-│  ████████░░  域名         │     按剩余天数升序
-│  ██████████  驾驶证       │
-├─────────────────────────┤
-│ 💧 消耗品预估             │  ← Consumption 分组
-│  ███░░░░░░░  水表         │     按预估剩余天数升序
-└─────────────────────────┘
-```
+| 平台 | 要求 |
+|------|------|
+| Android Chrome | HTTPS + `manifest.json` + Service Worker |
+| iOS Safari | iOS 16.4+（Push 需 iOS 17+）；必须通过「添加到主屏幕」安装 |
 
-- 已过期 / 估算已耗尽的条目：置顶显示（最紧迫）
-- 消耗品不足 2 条记录（无法预估）：显示在分组末尾，附引导提示
-- 已归档条目：不出现在主列表
+### 安装步骤（iOS）
 
----
+1. 用 **Safari** 打开站点（其他浏览器不支持 iOS PWA 安装）
+2. 点击底部分享按钮 → **添加到主屏幕**
+3. 从主屏幕打开 App，进入全屏独立模式后即可订阅推送通知
 
-### 类型一：到期提醒（Deadline）
+### Web Push 通知
 
-**适用场景：** VPS、域名、驾驶证、身份证、保险、宽带等
+- 用户在主页点击铃铛图标授权，订阅信息存入 `push_subscriptions` 表
+- 每小时 Cron 自动扫描：到期提醒提前 `alert_days` 天推送，每条目 20 小时内去重
+- 管理员可在 `/admin/users` 手动向全部或指定用户发送推送
 
-**字段：** 名称、到期日期、标签、备注、预警天数（默认 30 天）
+### Cloudflare 配置注意事项
 
-**卡片展示：**
-- 名称 + 标签
-- 「还剩 X 天」或「已过期 X 天」
-- Drain Bar（从到期日往前推整个有效周期，进度条反映消耗比例）
-- 状态：`正常` / `即将到期` / `已过期`
+若站点前面有 Cloudflare CDN，**必须** 对以下路径禁用缓存（Page Rule 或 Cache Rule）：
 
-**续期操作：**
-- 详情页提供「续期」按钮，输入新到期日期
-- 每次续期记录到 `deadline_renewals` 表（保留完整历史）
-- 不允许通过「编辑」直接修改到期日（避免跳过历史记录）
+| 路径 | 原因 |
+|------|------|
+| `/manifest.json` | 必须实时返回，不能缓存旧版 |
+| `/sw.js` | Service Worker 更新依赖 `no-cache` 响应头 |
+| `/icons/*` | PWA 图标；缓存旧重定向会导致 iOS 安装失败 |
+| `/api/*` | 所有 API 均不应缓存 |
 
----
+> **排查经验**：若 iOS 用户添加到主屏幕后无法进入全屏模式，优先检查 Cloudflare 是否缓存了上述路径的 307/301 重定向（在 CF 控制台手动清除对应 URL 的缓存）。清除后，要求用户同时清除 Safari 本地缓存（**设置 → Safari → 清除历史记录与网站数据**）。
 
-### 类型二：消耗预估（Consumption）
+### PWA 诊断工具
 
-**适用场景：** 预付费水表（m³）、电表（度）、燃气表（m³）、流量卡（GB）等
+访问 `https://你的域名/pwa-check`（无需登录），可检测：
 
-**设计原则：** 通用模型（自定义名称 + 单位），当前落地场景为水表。
+- HTTPS 状态、iOS/Android 识别
+- `manifest.json` / `icon-192.png` / `apple-touch-icon.png` 加载结果及实际 MIME 类型
+- Service Worker 注册状态
+- Notification API 支持及权限状态
+- 独立（standalone）模式检测
 
-**字段：** 名称、单位（如：立方、度、GB）、标签、备注、预警天数
-
-**卡片展示：**
-- 名称 + 单位 + 标签
-- 「估算当前余量 X 单位」（从上次录入时间外推）
-- 「预估还可用 X 天 / 预估耗尽日期」
-- Drain Bar（基于预估剩余天数，而非绝对值）
-- 状态：`正常` / `即将耗尽` / `可能已耗尽`（估算余量 ≤ 0）
-
-**冷启动状态：**
-
-| 已录入条数 | 卡片显示 |
-|-----------|---------|
-| 0 条 | 引导录入第一条示数 |
-| 1 条 | 显示录入值，提示「再录入一次即可开始预估」|
-| ≥ 2 条 | 完整展示预估数据 |
-
-**示数录入规则：**
-- 每次录入：时间戳 + 示数值（支持 2 位小数）+ 可选备注
-- 新值 > 上一条 → 自动标记为充值事件，开启新消耗分段
-- 支持标记单条记录为「异常值」，异常记录不计入速率计算
-
-**消耗速率算法：**
-1. 按充值事件切分「消耗分段」
-2. 计算每段的日均消耗速率
-3. 加权平均（越近的分段权重越高，指数衰减）
-4. 估算当前余量 = 最后录入值 − (距上次录入天数 × 加权速率)
-5. 估算耗尽日期 = 当前时间 + (估算当前余量 ÷ 加权速率)
-
-**详情页：**
-- 历史录入列表（支持编辑 / 删除单条 / 标记异常）
-- 消耗趋势折线图（实际示数点 + 速率延伸预测线）
-
----
-
-### 通用功能
-
-- 搜索（按名称）
-- 标签筛选
-- 新增 / 编辑 / 归档 / 删除
-- 归档页：查看已归档条目，支持恢复或彻底删除
-- 提醒机制（后期迭代，需引入定时任务）
+点击「**发送报告给管理员**」，报告会存入数据库，管理员在 `/admin/users` 的「PWA 诊断日志」区块查看。
 
 ---
 
 ## 数据模型
 
 ```sql
--- 物品主表
-items (
-  id, name, type ENUM('deadline','consumption'),
-  notes, archived_at, created_at, updated_at
-)
+-- 用户（better-auth 管理，camelCase 列名）
+"user" (id, name, email, "emailVerified", role, banned, ...)
+"session" (id, token, "userId", "expiresAt", ...)
+"account" (id, "userId", "providerId", ...)
+
+-- 邀请码（注册需要邀请码）
+invite_codes (code, created_by, used_by, expires_at, ...)
+
+-- 条目主表
+items (id, name, type, notes, archived_at, user_id, created_at, updated_at)
 
 -- 标签
 tags (id, name, color)
 item_tags (item_id, tag_id)
 
--- 到期类扩展
-deadline_items (item_id, expire_date, alert_days DEFAULT 30)
+-- 到期提醒类
+deadline_items (item_id, expire_date, start_date, alert_days)
+deadline_renewals (id, item_id, renewed_at, old_expire_date, new_expire_date, notes)
 
--- 到期类续期记录
-deadline_renewals (
-  id, item_id, renewed_at,
-  old_expire_date, new_expire_date, notes
-)
+-- 消耗预估类
+consumption_items (item_id, unit, alert_days)
+consumption_logs (id, item_id, recorded_at, value, is_topup, is_anomaly, notes)
 
--- 消耗类扩展
-consumption_items (item_id, unit, alert_days DEFAULT 7)
+-- Web Push
+push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
+push_log (id, user_id, item_id, sent_at)  -- 去重日志
 
--- 消耗类示数记录
-consumption_logs (
-  id, item_id, recorded_at,
-  value REAL,          -- 示数（支持小数）
-  is_topup BOOLEAN,    -- 系统自动识别充值
-  is_anomaly BOOLEAN,  -- 用户手动标记异常
-  notes
-)
+-- PWA 诊断
+pwa_diagnostics (id, user_agent, is_ios, ios_version, is_standalone,
+                  manifest_ok, icon192_ok, apple_icon_ok, apple_icon_mime,
+                  sw_registered, notif_perm, push_supported, submitted_at, ...)
 ```
+
+Schema 变更通过 `src/lib/schema.ts` 中的 `migrate()` 幂等迁移，服务启动时自动执行。
 
 ---
 
 ## 技术注意事项
 
-- **时区**：日期存 UTC，展示按客户端本地时区转换
-- **告警触发时机**：用户打开页面时实时计算（后期扩展为定时推送）
-- **扩展口**：API Routes 设计保持与数据库无关，底层使用 `@neondatabase/serverless` HTTP 驱动
+- **时区**：日期字段存 UTC ISO 字符串，展示按客户端本地时区转换
+- **认证中间件**：`src/proxy.ts` 实现路由守卫；PWA 静态资源（manifest、sw.js、icons）已加入公开白名单，并追加 `Cache-Control: no-store` 防止浏览器缓存旧重定向
+- **Cron 鉴权**：设置 `CRON_SECRET` 后，`/api/cron` 校验 `x-cron-secret` 请求头；未设置时仅接受 localhost 调用
+- **VAPID Email**：支持带或不带 `mailto:` 前缀（代码自动处理）
+- **推送去重**：同一条目同一用户 20 小时内只推送一次，避免骚扰
+- **iOS Push 限制**：iOS 要求 PWA 必须处于**独立模式**（从主屏幕打开）才能收到推送通知，在 Safari 浏览器中不支持
 
 ---
 
-## 待迭代
+## 产品功能
 
-- [ ] 提醒机制（Web Push / 邮件）
-- [ ] PWA 支持（手机添加到桌面）
-- [ ] 消耗趋势图时间范围切换（近 30 天 / 近 90 天 / 全部）
-- [ ] 数据导出（JSON / CSV 备份）
+### 类型一：到期提醒（Deadline）
+
+**适用场景：** VPS、域名、驾驶证、身份证、保险、宽带等
+
+- 名称、到期日期、标签、备注、预警天数（默认 30 天）
+- Drain Bar：进度条从满格向左消耗，配色随剩余量渐变（绿 → 黄 → 红）
+- 续期操作：每次续期记入 `deadline_renewals`，保留完整历史
+
+### 类型二：消耗预估（Consumption）
+
+**适用场景：** 预付费水表（m³）、电表（度）、流量卡（GB）等
+
+- 支持 2 位小数示数录入，自动识别充值（新值 > 上条 → 新消耗分段）
+- 支持标记异常值，异常记录不计入速率计算
+- **消耗速率算法**：按充值事件切分分段 → 各段日均速率 → 指数衰减加权平均 → 外推估算余量和耗尽日期
+- 消耗趋势图（折线图 + 预测线）+ 消耗热力图
+
+### 通用功能
+
+- 搜索（按名称）、标签筛选
+- 新增 / 编辑 / 归档 / 删除
+- 归档页：查看已归档条目，支持恢复或彻底删除
+- 深色 / 浅色主题切换（持久化，防闪烁）
+- 演示模式（`/demo`，无需账号）
+- 管理员面板（用户管理、邀请码、推送广播、PWA 诊断）
