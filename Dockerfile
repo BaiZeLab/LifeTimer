@@ -29,6 +29,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/start.js ./
+COPY --from=builder /app/scripts ./scripts
 
 EXPOSE 3100
 CMD ["node", "start.js"]

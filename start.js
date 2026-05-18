@@ -103,12 +103,15 @@ function executeCronJob() {
   req.end();
 }
 
-// Poll until server is ready, then start cron
+// Poll until server is ready, then start cron.
+// Guard flag prevents double-start when two poll requests land before clearInterval fires.
+let cronStarted = false;
 const pollId = setInterval(() => {
   const req = http.get(POLL_URL, (res) => {
-    if (res.statusCode >= 200 && res.statusCode < 400) {
-      console.log("[startup] Server is ready — starting cron scheduler");
+    if (res.statusCode >= 200 && res.statusCode < 400 && !cronStarted) {
+      cronStarted = true;
       clearInterval(pollId);
+      console.log("[startup] Server is ready — starting cron scheduler");
 
       // First run immediately (with a small delay to let DB migrations finish)
       setTimeout(executeCronJob, 5000);
