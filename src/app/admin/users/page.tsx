@@ -489,6 +489,13 @@ export default function AdminUsersPage() {
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{
+                        fontSize: "0.75rem", fontFamily: "ui-monospace, monospace",
+                        color: "var(--lt-ink-4)", background: "var(--lt-surface-2)",
+                        padding: "1px 6px", borderRadius: "5px",
+                      }}>
+                        {`DIAG-${String(d.id).padStart(4, "0")}`}
+                      </span>
                       <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--lt-ink-2)" }}>
                         {platform}
                       </span>

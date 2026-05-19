@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(html.dark *));
 
 /* ─── Life Timer Design Tokens ─────────────────────────────────── */
 :root {
@@ -114,8 +114,10 @@
   }
 }
 
-/* JS-controlled dark class (overrides both light and system-dark) */
-.dark {
+/* JS-controlled dark class (overrides both light and system-dark)
+   Use html.dark (specificity 0,1,1) instead of .dark (0,1,0) to beat
+   :root (0,1,0) regardless of CSS declaration order after Tailwind processing. */
+html.dark {
   --lt-bg:         oklch(13.5% 0.014 263);
   --lt-surface:    oklch(20%   0.016 263);
   --lt-surface-2:  oklch(27%   0.013 263);
@@ -205,7 +207,7 @@ body {
   padding: 4px;
 }
 
-.dark .lt-tabs { background: oklch(28% 0.013 80); }
+html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 
 .lt-tab {
   border: none;
@@ -410,7 +412,7 @@ body {
 
 .lt-overflow-item.danger:hover { background: var(--lt-danger-hover-bg); }
 
-.dark .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
+html.dark .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
 
 /* ─── Tag chip input ───────────────────────────────────────────── */
 .lt-tag-input-wrap {
@@ -432,7 +434,7 @@ body {
   box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
 }
 
-.dark .lt-tag-input-wrap:focus-within {
+html.dark .lt-tag-input-wrap:focus-within {
   box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12);
 }
 
@@ -539,7 +541,7 @@ body {
   box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
 }
 
-.dark .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
+html.dark .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
 
 .lt-input::placeholder { color: var(--lt-ink-4); }
 
@@ -570,7 +572,7 @@ body {
   padding: 3px;
 }
 
-.dark .lt-seg { background: oklch(30% 0.013 80); }
+html.dark .lt-seg { background: oklch(30% 0.013 80); }
 
 .lt-seg-btn {
   border: none;
@@ -628,7 +630,7 @@ body {
 .lt-btn-ghost:not(:disabled):hover  { background: oklch(89% 0.012 88); color: var(--lt-ink-1); }
 .lt-btn-ghost:not(:disabled):active { filter: brightness(0.94); }
 
-.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); }
+html.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); }
 
 /* ─── Modal footer ──────────────────────────────────────────────── */
 .lt-modal-footer {

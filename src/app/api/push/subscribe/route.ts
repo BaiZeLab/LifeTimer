@@ -29,6 +29,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
   }
 
+  // Derive the push-service host (protocol + hostname) from the endpoint URL.
+  // e.g. "https://fcm.googleapis.com/fcm/send/xxx" → "https://fcm.googleapis.com"
+  // This lets us implement "one subscription per push service per user":
+  // when the user reinstalls the PWA they get a new endpoint from the same service;
+  // we replace the old one instead of accumulating stale subscriptions.
+  let serviceHost: string;
+  try {
+    const url = new URL(body.endpoint);
+    serviceHost = `${url.protocol}//${url.host}`;
+  } catch {
+    return NextResponse.json({ error: "Invalid endpoint URL" }, { status: 400 });
+  }
+
+  // Remove existing subscriptions for this user from the same push service,
+  // then insert the fresh one.  Using a transaction ensures atomicity.
+  await sql`
+    DELETE FROM push_subscriptions
+    WHERE user_id = ${session.user.id}
+      AND endpoint LIKE ${serviceHost + "/%"}
+  `;
+
   await sql`
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
     VALUES (${session.user.id}, ${body.endpoint}, ${body.keys.p256dh}, ${body.keys.auth})

@@ -145,6 +145,7 @@ export default function PwaCheckPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [diagCode, setDiagCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const run = async () => {
@@ -164,11 +165,13 @@ export default function PwaCheckPage() {
     if (!result) return;
     setSending(true);
     try {
-      await fetch("/api/pwa-check", {
+      const res = await fetch("/api/pwa-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result),
       });
+      const data = await res.json() as { diagCode?: string };
+      setDiagCode(data.diagCode ?? null);
       setSent(true);
     } catch {
       // Ignore — offline device
@@ -180,7 +183,7 @@ export default function PwaCheckPage() {
   const copy = async () => {
     if (!result) return;
     const text = [
-      `=== PWA 诊断报告 ${result.timestamp} ===`,
+      `=== PWA 诊断报告 ${diagCode ?? ""} ${result.timestamp} ===`,
       `UA: ${result.userAgent}`,
       `iOS: ${result.isIos} (${result.iosVersion}) | Android: ${result.isAndroid}`,
       `Standalone: ${result.isStandalone} | HTTPS: ${result.isHttps}`,
@@ -297,7 +300,7 @@ export default function PwaCheckPage() {
                 {sent ? (
                   <>
                     <Check size={16} />
-                    已发送给管理员
+                    {diagCode ? `已发送 · ${diagCode}` : "已发送给管理员"}
                   </>
                 ) : sending ? (
                   <>

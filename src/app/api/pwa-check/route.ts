@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const str  = (k: string) => (typeof body[k] === "string" ? String(body[k]).slice(0, 2000) : null);
   const bool = (k: string) => (typeof body[k] === "boolean" ? body[k] as boolean : null);
 
-  await sql`
+  const rows = await sql`
     INSERT INTO pwa_diagnostics (
       user_agent, is_ios, ios_version, is_android, is_standalone, is_https,
       sw_supported, sw_registered,
@@ -49,9 +49,13 @@ export async function POST(req: NextRequest) {
       ${str("appleIconUrl")},
       ${JSON.stringify(body)}
     )
-  `;
+    RETURNING id
+  ` as { id: number }[];
 
-  return NextResponse.json({ ok: true });
+  const id = rows[0]?.id ?? 0;
+  const diagCode = `DIAG-${String(id).padStart(4, "0")}`;
+
+  return NextResponse.json({ ok: true, diagCode, id });
 }
 
 // ── GET /api/pwa-check ────────────────────────────────────────────────────────
