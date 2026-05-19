@@ -49,6 +49,21 @@
   --lt-fab-bg:    oklch(18% 0.032 75);
   --lt-fab-color: oklch(97% 0.005 88);
 
+  /* Tab bar */
+  --lt-tabs-bg:           oklch(91% 0.012 88);
+  --lt-tab-active-bg:     var(--lt-ink-1);
+  --lt-tab-active-color:  var(--lt-on-ink);
+  --lt-tab-active-shadow: 0 2px 8px oklch(17% 0.032 75 / 0.20);
+  --lt-tab-badge-active:          oklch(100% 0.003 88 / 0.22);
+  --lt-tab-badge-active-urgent:   oklch(75% 0.180 27 / 0.45);
+  --lt-tab-badge-inactive-urgent: oklch(97% 0.020 25);
+
+  /* Shadows (theme-aware) */
+  --lt-card-shadow-hover: 0 6px 24px oklch(17% 0.032 75 / 0.10),
+                          0 2px 6px  oklch(17% 0.032 75 / 0.06);
+  --lt-shadow-fab:        0 4px 20px oklch(10% 0.025 75 / 0.32);
+  --lt-shadow-fab-hover:  0 6px 28px oklch(10% 0.025 75 / 0.44);
+
   /* Skeleton shimmer — warm cream tones */
   --lt-skel-base:  oklch(93.5% 0.010 88);
   --lt-skel-shine: oklch(97.8% 0.006 88);
@@ -96,8 +111,19 @@
     --lt-card-shadow: 0 2px 12px oklch(5% 0.02 263 / 0.50),
                       0 1px 3px  oklch(5% 0.02 263 / 0.35);
     --lt-on-ink:     oklch(18%   0.035 263);
-    --lt-fab-bg:    oklch(86%   0.008 88);
-    --lt-fab-color: oklch(18%   0.038 263);
+    --lt-fab-bg:    oklch(38%   0.014 263);
+    --lt-fab-color: oklch(95%   0.005 88);
+    --lt-tabs-bg:           oklch(28% 0.013 263);
+    --lt-tab-active-bg:     oklch(36% 0.014 263);
+    --lt-tab-active-color:  oklch(95% 0.005 88);
+    --lt-tab-active-shadow: 0 2px 8px oklch(5% 0.02 263 / 0.45);
+    --lt-tab-badge-active:          oklch(100% 0.005 88 / 0.18);
+    --lt-tab-badge-active-urgent:   oklch(58% 0.180 27 / 0.65);
+    --lt-tab-badge-inactive-urgent: oklch(45% 0.120 27 / 0.40);
+    --lt-card-shadow-hover: 0 6px 24px oklch(5% 0.02 263 / 0.35),
+                            0 2px 6px  oklch(5% 0.02 263 / 0.22);
+    --lt-shadow-fab:        0 4px 20px oklch(5% 0.02 263 / 0.55);
+    --lt-shadow-fab-hover:  0 6px 28px oklch(5% 0.02 263 / 0.65);
     --lt-skel-base:  oklch(23%   0.012 263);
     --lt-skel-shine: oklch(29%   0.010 263);
     --background: var(--lt-bg);
@@ -135,8 +161,19 @@ html.dark {
   --lt-card-shadow: 0 2px 12px oklch(5% 0.02 263 / 0.50),
                     0 1px 3px  oklch(5% 0.02 263 / 0.35);
   --lt-on-ink:     oklch(18%   0.035 263);
-  --lt-fab-bg:    oklch(86%   0.008 88);
-  --lt-fab-color: oklch(18%   0.038 263);
+  --lt-fab-bg:    oklch(38%   0.014 263);
+  --lt-fab-color: oklch(95%   0.005 88);
+  --lt-tabs-bg:           oklch(28% 0.013 263);
+  --lt-tab-active-bg:     oklch(36% 0.014 263);
+  --lt-tab-active-color:  oklch(95% 0.005 88);
+  --lt-tab-active-shadow: 0 2px 8px oklch(5% 0.02 263 / 0.45);
+  --lt-tab-badge-active:          oklch(100% 0.005 88 / 0.18);
+  --lt-tab-badge-active-urgent:   oklch(58% 0.180 27 / 0.65);
+  --lt-tab-badge-inactive-urgent: oklch(45% 0.120 27 / 0.40);
+  --lt-card-shadow-hover: 0 6px 24px oklch(5% 0.02 263 / 0.35),
+                          0 2px 6px  oklch(5% 0.02 263 / 0.22);
+  --lt-shadow-fab:        0 4px 20px oklch(5% 0.02 263 / 0.55);
+  --lt-shadow-fab-hover:  0 6px 28px oklch(5% 0.02 263 / 0.65);
   --lt-skel-base:  oklch(23%   0.012 263);
   --lt-skel-shine: oklch(29%   0.010 263);
   --background: var(--lt-bg);
@@ -202,12 +239,10 @@ body {
 .lt-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: oklch(91% 0.012 88);
+  background: var(--lt-tabs-bg);
   border-radius: 9999px;
   padding: 4px;
 }
-
-html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 
 .lt-tab {
   border: none;
@@ -227,9 +262,9 @@ html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 }
 
 .lt-tab.active {
-  background: var(--lt-ink-1);
-  color: var(--lt-on-ink);
-  box-shadow: 0 2px 8px oklch(17% 0.032 75 / 0.20);
+  background: var(--lt-tab-active-bg);
+  color: var(--lt-tab-active-color);
+  box-shadow: var(--lt-tab-active-shadow);
 }
 
 /* ─── Search ───────────────────────────────────────────────────── */
@@ -268,8 +303,7 @@ html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 /* lifted hover shadow also uses warm-tinted color */
 .lt-card:hover {
   background: var(--lt-surface-hover);
-  box-shadow: 0 6px 24px oklch(17% 0.032 75 / 0.10),
-              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+  box-shadow: var(--lt-card-shadow-hover);
   transform: translateY(-1px);
 }
 
@@ -280,8 +314,7 @@ html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 }
 .lt-card[data-status="warning"]:hover {
   box-shadow: inset 0 0 0 1.5px oklch(78% 0.100 65 / 0.60),
-              0 6px 24px oklch(17% 0.032 75 / 0.10),
-              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+              var(--lt-card-shadow-hover);
 }
 .lt-card[data-status="danger"] {
   box-shadow: inset 0 0 0 1.5px oklch(72% 0.130 27 / 0.55),
@@ -289,8 +322,7 @@ html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 }
 .lt-card[data-status="danger"]:hover {
   box-shadow: inset 0 0 0 1.5px oklch(72% 0.130 27 / 0.55),
-              0 6px 24px oklch(17% 0.032 75 / 0.10),
-              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+              var(--lt-card-shadow-hover);
 }
 .lt-card[data-status="expired"] {
   box-shadow: inset 0 0 0 1.5px oklch(65% 0.016 80 / 0.45),
@@ -298,8 +330,7 @@ html.dark .lt-tabs { background: oklch(28% 0.013 80); }
 }
 .lt-card[data-status="expired"]:hover {
   box-shadow: inset 0 0 0 1.5px oklch(65% 0.016 80 / 0.45),
-              0 6px 24px oklch(17% 0.032 75 / 0.10),
-              0 2px 6px  oklch(17% 0.032 75 / 0.06);
+              var(--lt-card-shadow-hover);
 }
 
 /* ─── Status Summary (proportional bar chart) ──────────────────── */
@@ -351,14 +382,14 @@ html.dark .lt-tabs { background: oklch(28% 0.013 80); }
   display: none;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px oklch(10% 0.025 75 / 0.32);
+  box-shadow: var(--lt-shadow-fab);
   z-index: 50;
   transition: transform 150ms ease-out, box-shadow 150ms ease-out;
 }
 
 .lt-fab:hover {
   transform: scale(1.07);
-  box-shadow: 0 6px 28px oklch(10% 0.025 75 / 0.44);
+  box-shadow: var(--lt-shadow-fab-hover);
 }
 
 .lt-fab:active { transform: scale(0.96); }

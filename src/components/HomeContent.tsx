@@ -2308,10 +2308,11 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
               onClick={() => setModalOpen(true)}
               style={{
                 width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-ink-1)", border: "none",
+                background: "var(--lt-fab-bg)", border: "none",
                 cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-on-ink)",
+                color: "var(--lt-fab-color)",
+                boxShadow: "var(--lt-shadow-fab)",
                 transition: "transform 120ms ease-out, filter 120ms ease-out",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
@@ -2335,10 +2336,10 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
                 borderRadius: "9999px", fontSize: "11px", fontWeight: 700,
                 padding: "0 5px",
                 background: tab === "deadline"
-                  ? (dlUrgent > 0 ? "oklch(75% 0.180 27 / 0.45)" : "oklch(100% 0.003 88 / 0.22)")
-                  : (dlUrgent > 0 ? "oklch(97% 0.020 25)" : "var(--lt-track)"),
+                  ? (dlUrgent > 0 ? "var(--lt-tab-badge-active-urgent)" : "var(--lt-tab-badge-active)")
+                  : (dlUrgent > 0 ? "var(--lt-tab-badge-inactive-urgent)" : "var(--lt-track)"),
                 color: tab === "deadline"
-                  ? "var(--lt-on-ink)"
+                  ? "var(--lt-tab-active-color)"
                   : (dlUrgent > 0 ? "var(--lt-danger)" : "var(--lt-ink-3)"),
               }}>
                 {deadlines.length}
@@ -2356,10 +2357,10 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
                 borderRadius: "9999px", fontSize: "11px", fontWeight: 700,
                 padding: "0 5px",
                 background: tab === "consumption"
-                  ? (csUrgent > 0 ? "oklch(75% 0.180 27 / 0.45)" : "oklch(100% 0.003 88 / 0.22)")
-                  : (csUrgent > 0 ? "oklch(97% 0.020 25)" : "var(--lt-track)"),
+                  ? (csUrgent > 0 ? "var(--lt-tab-badge-active-urgent)" : "var(--lt-tab-badge-active)")
+                  : (csUrgent > 0 ? "var(--lt-tab-badge-inactive-urgent)" : "var(--lt-track)"),
                 color: tab === "consumption"
-                  ? "var(--lt-on-ink)"
+                  ? "var(--lt-tab-active-color)"
                   : (csUrgent > 0 ? "var(--lt-danger)" : "var(--lt-ink-3)"),
               }}>
                 {consumptions.length}

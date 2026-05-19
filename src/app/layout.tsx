@@ -35,7 +35,21 @@ const THEME_SCRIPT = `(function(){
   try {
     var t = localStorage.getItem('lt-theme');
     if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    if (t === 'dark') document.documentElement.classList.add('dark');
+    var h = document.documentElement;
+    if (t === 'dark') {
+      h.classList.add('dark');
+      h.classList.remove('light');
+    } else {
+      h.classList.add('light');
+      h.classList.remove('dark');
+    }
+    var c = t === 'dark' ? '#222232' : '#F1EBDF';
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
+    m.content = c;
+    var s = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (!s) { s = document.createElement('meta'); s.name = 'apple-mobile-web-app-status-bar-style'; document.head.appendChild(s); }
+    s.content = t === 'dark' ? 'black-translucent' : 'default';
   } catch(e){}
 })();`;
 
@@ -55,6 +69,8 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
           tag is the compat shim for older devices. It is NOT a duplicate of mobile-web-app-capable.
         */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="theme-color" content="#F1EBDF" />
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
