@@ -29,25 +29,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
   }
 
-  // Derive the push-service host (protocol + hostname) from the endpoint URL.
-  // e.g. "https://fcm.googleapis.com/fcm/send/xxx" → "https://fcm.googleapis.com"
-  // This lets us implement "one subscription per push service per user":
-  // when the user reinstalls the PWA they get a new endpoint from the same service;
-  // we replace the old one instead of accumulating stale subscriptions.
-  let serviceHost: string;
-  try {
-    const url = new URL(body.endpoint);
-    serviceHost = `${url.protocol}//${url.host}`;
-  } catch {
-    return NextResponse.json({ error: "Invalid endpoint URL" }, { status: 400 });
-  }
+  // Cap at MAX_SUBS per user to prevent unlimited accumulation from repeated
+  // PWA reinstalls.  We keep the newest subscriptions (by created_at DESC) so
+  // that fresh device installs are always retained.  Stale subscriptions from
+  // deleted PWAs are cleaned up naturally by the cron job when a send attempt
+  // returns 404/410.
+  //
+  // We intentionally do NOT scope cleanup by push-service host because
+  // iPhone and Mac Safari both use web.push.apple.com — deleting by host would
+  // remove one device's subscription when the other device re-subscribes.
+  const MAX_SUBS = 5;
 
-  // Remove existing subscriptions for this user from the same push service,
-  // then insert the fresh one.  Using a transaction ensures atomicity.
   await sql`
     DELETE FROM push_subscriptions
     WHERE user_id = ${session.user.id}
-      AND endpoint LIKE ${serviceHost + "/%"}
+      AND id IN (
+        SELECT id FROM push_subscriptions
+        WHERE user_id = ${session.user.id}
+        ORDER BY created_at DESC
+        OFFSET ${MAX_SUBS - 1}
+      )
   `;
 
   await sql`
