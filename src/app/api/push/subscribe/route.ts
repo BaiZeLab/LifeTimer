@@ -29,27 +29,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
   }
 
-  // Cap at MAX_SUBS per user to prevent unlimited accumulation from repeated
-  // PWA reinstalls.  We keep the newest subscriptions (by created_at DESC) so
-  // that fresh device installs are always retained.  Stale subscriptions from
-  // deleted PWAs are cleaned up naturally by the cron job when a send attempt
-  // returns 404/410.
+  // Upsert first, then cap.
   //
-  // We intentionally do NOT scope cleanup by push-service host because
-  // iPhone and Mac Safari both use web.push.apple.com — deleting by host would
-  // remove one device's subscription when the other device re-subscribes.
+  // Order matters: if the same endpoint re-subscribes we want ON CONFLICT to
+  // update in-place (count stays the same), not trigger an extra delete first
+  // which would drop a legitimate subscription from another device.
+  //
+  // Cap rationale: prevents unlimited accumulation when users repeatedly
+  // reinstall the PWA.  We keep the newest MAX_SUBS entries; stale ones from
+  // deleted PWAs get cleaned up naturally when the cron send attempt returns
+  // 404/410.  We do NOT scope the cap by push-service host because iPhone and
+  // Mac Safari both use web.push.apple.com — that would make them stomp on
+  // each other's subscription.
   const MAX_SUBS = 5;
-
-  await sql`
-    DELETE FROM push_subscriptions
-    WHERE user_id = ${session.user.id}
-      AND id IN (
-        SELECT id FROM push_subscriptions
-        WHERE user_id = ${session.user.id}
-        ORDER BY created_at DESC
-        OFFSET ${MAX_SUBS - 1}
-      )
-  `;
 
   await sql`
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -58,6 +50,18 @@ export async function POST(req: NextRequest) {
       SET user_id = ${session.user.id},
           p256dh  = ${body.keys.p256dh},
           auth    = ${body.keys.auth}
+  `;
+
+  // After upsert, trim any excess beyond the cap (keeps newest MAX_SUBS rows)
+  await sql`
+    DELETE FROM push_subscriptions
+    WHERE user_id = ${session.user.id}
+      AND id IN (
+        SELECT id FROM push_subscriptions
+        WHERE user_id = ${session.user.id}
+        ORDER BY created_at DESC
+        OFFSET ${MAX_SUBS}
+      )
   `;
 
   return NextResponse.json({ ok: true });

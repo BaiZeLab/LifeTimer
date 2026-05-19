@@ -143,10 +143,12 @@ export async function GET(req: NextRequest) {
     };
 
     // Send to each subscription, remove stale ones
+    let sentThisUser = 0;
     for (const sub of subs) {
       const ok = await sendPush(sub, payload);
       if (ok) {
         totalSent++;
+        sentThisUser++;
       } else {
         // Stale subscription — remove it
         await sql`DELETE FROM push_subscriptions WHERE endpoint = ${sub.endpoint}`;
@@ -154,8 +156,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Record sent in push_log
-    if (toAlert.length > 0) {
+    // Only record in push_log when at least one notification was actually
+    // delivered.  If every subscription was stale (sentThisUser === 0) we skip
+    // the log so the user gets another attempt next cron run once they
+    // re-subscribe with a valid endpoint.
+    if (sentThisUser > 0) {
       for (const item of toAlert) {
         await sql`
           INSERT INTO push_log (user_id, item_id) VALUES (${user_id}, ${item.id})
