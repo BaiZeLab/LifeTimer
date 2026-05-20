@@ -99,7 +99,7 @@ export function calcConsumptionEstimate(
   const estimatedDays = Math.floor(estimatedValue / dailyRate);
 
   const drainPct = calcDrainPct(estimatedDays, alertDays);
-  const status = calcStatus(estimatedDays);
+  const status = calcStatus(estimatedDays, alertDays);
 
   return { dailyRate, estimatedValue, estimatedDays, drainPct, status };
 }
@@ -137,10 +137,13 @@ function daysBetween(a: string, b: string): number {
   return (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
 }
 
-function calcStatus(daysLeft: number, alertDays = 30): ItemStatus {
-  if (daysLeft <= 0)           return "expired";
-  if (daysLeft <= 7)           return "danger";
-  if (daysLeft <= alertDays)   return "warning";
+function calcStatus(daysLeft: number, alertDays: number): ItemStatus {
+  if (daysLeft <= 0) return "expired";
+  // Urgent band: last 7 days, but never wider than the configured alert window.
+  // (When alertDays < 7, the old hard-coded 7 would fire before alertDays — e.g. alert at 6d with alertDays=5.)
+  const dangerDays = Math.min(7, alertDays);
+  if (daysLeft <= dangerDays) return "danger";
+  if (daysLeft <= alertDays) return "warning";
   return "ok";
 }
 
