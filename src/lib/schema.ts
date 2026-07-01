@@ -178,11 +178,16 @@ export async function migrate(): Promise<void> {
       id              SERIAL PRIMARY KEY,
       item_id         INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
       renewed_at      TEXT    NOT NULL DEFAULT TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS."000Z"'),
+      old_start_date  TEXT,
       old_expire_date TEXT    NOT NULL,
+      new_start_date  TEXT,
       new_expire_date TEXT    NOT NULL,
       notes           TEXT
     )
   `;
+
+  await sql`ALTER TABLE deadline_renewals ADD COLUMN IF NOT EXISTS old_start_date TEXT`;
+  await sql`ALTER TABLE deadline_renewals ADD COLUMN IF NOT EXISTS new_start_date TEXT`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS consumption_items (

@@ -36,10 +36,37 @@ function fmtDate(dateStr: string): string {
     : `${d.getFullYear()}年${m}月${day}日`;
 }
 
+function fmtFullDate(dateStr: string): string {
+  const d = new Date(dateStr.slice(0, 10) + "T00:00:00");
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function fmtDateRange(
+  startDate: string | null | undefined,
+  endDate: string,
+  missingStartLabel = "未填写"
+): string {
+  return `${startDate ? fmtFullDate(startDate) : missingStartLabel} - ${fmtFullDate(endDate)}`;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab = "deadline" | "consumption";
 type AddType = "deadline" | "consumption";
+type ExpandedCardKey = `${Tab}:${number}` | null;
+
+type DeadlineHistoryEntry = {
+  id: string;
+  kind: "initial" | "renewal";
+  rangeStartDate: string | null;
+  rangeStartMissingLabel?: string;
+  rangeEndDate: string;
+  previousRangeStartDate?: string | null;
+  previousRangeStartMissingLabel?: string;
+  previousRangeEndDate?: string;
+  renewedAt: string | null;
+  notes: string | null;
+};
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 
@@ -815,8 +842,65 @@ function ConsumptionChart({ logs, unit, estimatedDays, status, chartId, timeRang
 
 // ── DeadlineCard ──────────────────────────────────────────────────────────────
 
+function buildDeadlineHistory(item: DeadlineItemDTO, renewals: DeadlineRenewal[]): DeadlineHistoryEntry[] {
+  const sortedAsc = [...renewals].sort(
+    (a, b) => new Date(a.renewedAt).getTime() - new Date(b.renewedAt).getTime()
+  );
+
+  if (sortedAsc.length === 0) {
+    return [{
+      id: `initial-${item.id}`,
+      kind: "initial",
+      rangeStartDate: item.startDate,
+      rangeEndDate: item.expireDate,
+      renewedAt: null,
+      notes: null,
+    }];
+  }
+
+  const first = sortedAsc[0];
+  const initialStart = first.oldStartDate;
+  // Legacy renewal rows created before old_start_date/new_start_date existed
+  // cannot tell whether the original start date was empty or simply not recorded.
+  const firstIsLegacyRenewal = !first.oldStartDate && !first.newStartDate;
+  const entries: DeadlineHistoryEntry[] = [{
+    id: `initial-${item.id}`,
+    kind: "initial",
+    rangeStartDate: initialStart,
+    rangeStartMissingLabel: firstIsLegacyRenewal ? "未记录" : "未填写",
+    rangeEndDate: first.oldExpireDate,
+    renewedAt: null,
+    notes: null,
+  }];
+
+  sortedAsc.forEach((r, index) => {
+    const previous = sortedAsc[index - 1];
+    const previousStart =
+      r.oldStartDate ??
+      previous?.newStartDate ??
+      previous?.oldExpireDate ??
+      initialStart;
+    const currentStart = r.newStartDate ?? r.oldExpireDate;
+
+    entries.push({
+      id: `renewal-${r.id}`,
+      kind: "renewal",
+      rangeStartDate: currentStart,
+      rangeEndDate: r.newExpireDate,
+      previousRangeStartDate: previousStart,
+      previousRangeStartMissingLabel: !r.oldStartDate && !r.newStartDate ? "未记录" : "未填写",
+      previousRangeEndDate: r.oldExpireDate,
+      renewedAt: r.renewedAt,
+      notes: r.notes,
+    });
+  });
+
+  return entries.reverse();
+}
+
 function DeadlineCard({
   item, onRenew, onEdit, onArchive, onDelete, onTagClick, onLoadRenewals,
+  expanded, onToggleHistory,
 }: {
   item: DeadlineItemDTO;
   onRenew: (item: DeadlineItemDTO) => void;
@@ -824,20 +908,24 @@ function DeadlineCard({
   onArchive: (id: number) => void;
   onDelete: (id: number) => void;
   onTagClick: (tag: string) => void;
+  expanded: boolean;
+  onToggleHistory: (id: number) => void;
   /** Optional override: return renewals from in-memory store (demo mode) */
   onLoadRenewals?: (id: number) => Promise<DeadlineRenewal[]>;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [renewals, setRenewals] = useState<DeadlineRenewal[]>([]);
+  const [renewalsLoaded, setRenewalsLoaded] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
 
   const actionsVisible = hovered || pinned || expanded;
   const overdueDays = item.daysLeft < 0 ? Math.abs(item.daysLeft) : 0;
+  const historyEntries = buildDeadlineHistory(item, renewals);
 
   const toggleHistory = async () => {
-    if (!expanded && renewals.length === 0) {
+    onToggleHistory(item.id);
+    if (!expanded && !renewalsLoaded) {
       setLoadingHistory(true);
       try {
         if (onLoadRenewals) {
@@ -846,9 +934,9 @@ function DeadlineCard({
           const res = await fetch(`/api/items/${item.id}/renewals`);
           if (res.ok) setRenewals(await res.json());
         }
+        setRenewalsLoaded(true);
       } finally { setLoadingHistory(false); }
     }
-    setExpanded((v) => !v);
   };
 
   return (
@@ -882,26 +970,35 @@ function DeadlineCard({
       {expanded && (
         <HistoryPanel>
           <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--lt-ink-4)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "2px" }}>
-            续期记录
+            历史记录
           </div>
           {loadingHistory && <div style={{ fontSize: "13px", color: "var(--lt-ink-4)" }}>加载中…</div>}
-          {!loadingHistory && renewals.length === 0 && (
-            <div style={{ fontSize: "13px", color: "var(--lt-ink-4)" }}>暂无续期记录</div>
-          )}
-          {renewals.map((r) => (
-            <div key={r.id} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "7px 0",
+          {!loadingHistory && historyEntries.map((entry) => (
+            <div key={entry.id} style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: "12px",
+              alignItems: "start",
+              padding: "9px 0",
               borderBottom: "1px solid var(--lt-border-muted)",
             }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--lt-ink-2)" }}>
-                  {fmtDate(r.oldExpireDate)} → {fmtDate(r.newExpireDate)}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--lt-ink-2)" }}>
+                  {fmtDateRange(entry.rangeStartDate, entry.rangeEndDate, entry.rangeStartMissingLabel)}
                 </div>
-                {r.notes && <div style={{ fontSize: "12px", color: "var(--lt-ink-4)", marginTop: "2px" }}>{r.notes}</div>}
+                <div style={{ fontSize: "11px", color: "var(--lt-ink-4)", marginTop: "3px" }}>
+                  {entry.kind === "initial"
+                    ? "初始时间范围"
+                    : `由 ${fmtDateRange(
+                        entry.previousRangeStartDate,
+                        entry.previousRangeEndDate ?? entry.rangeEndDate,
+                        entry.previousRangeStartMissingLabel
+                      )} 续期而来`}
+                </div>
+                {entry.notes && <div style={{ fontSize: "12px", color: "var(--lt-ink-4)", marginTop: "3px" }}>{entry.notes}</div>}
               </div>
               <div style={{ fontSize: "11px", color: "var(--lt-ink-4)", flexShrink: 0, marginLeft: "12px" }}>
-                {fmtDate(r.renewedAt)}
+                {entry.renewedAt ? fmtFullDate(entry.renewedAt) : "初始"}
               </div>
             </div>
           ))}
@@ -911,7 +1008,7 @@ function DeadlineCard({
       <CardActions visible={actionsVisible}>
         <ActionBtn
           icon={expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          label={`续期记录${renewals.length > 0 ? ` (${renewals.length})` : ""}`}
+          label={`历史记录${renewalsLoaded ? ` (${historyEntries.length})` : ""}`}
           onClick={toggleHistory}
         />
         <div style={{ flex: 1 }} />
@@ -927,7 +1024,7 @@ function DeadlineCard({
 
 function ConsumptionCard({
   item, onAddLog, onEdit, onArchive, onDelete, onTagClick,
-  onLoadLogs, onPatchLog, onDeleteLog,
+  onLoadLogs, onPatchLog, onDeleteLog, expanded, onToggleHistory,
 }: {
   item: ConsumptionItemDTO;
   onAddLog: (item: ConsumptionItemDTO) => void;
@@ -935,6 +1032,8 @@ function ConsumptionCard({
   onArchive: (id: number) => void;
   onDelete: (id: number) => void;
   onTagClick: (tag: string) => void;
+  expanded: boolean;
+  onToggleHistory: (id: number) => void;
   /** Optional overrides for demo mode — replace internal fetch calls */
   onLoadLogs?: (id: number) => Promise<ConsumptionLog[]>;
   onPatchLog?: (itemId: number, logId: number, patch: PatchLogBody) => Promise<void>;
@@ -946,7 +1045,6 @@ function ConsumptionCard({
         .toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })
     : null;
 
-  const [expanded, setExpanded] = useState(false);
   const [logs, setLogs] = useState<ConsumptionLog[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -974,8 +1072,8 @@ function ConsumptionCard({
   };
 
   const toggleHistory = async () => {
+    onToggleHistory(item.id);
     if (!expanded) await loadLogs();
-    setExpanded((v) => !v);
   };
 
   const startEditLog = (log: ConsumptionLog) => {
@@ -1336,7 +1434,7 @@ function AddModal({
 
   const handleSave = async () => {
     if (!name.trim()) { setError("名称不能为空"); return; }
-    if (type === "deadline" && !expireDate) { setError("请选择到期日期"); return; }
+    if (type === "deadline" && !expireDate) { setError("请选择结束日期"); return; }
     if (type === "consumption" && !unit.trim()) { setError("请填写单位"); return; }
 
     setSaving(true); setError("");
@@ -1392,13 +1490,16 @@ function AddModal({
 
           {type === "deadline" ? (
             <>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--lt-ink-4)", letterSpacing: "0.04em" }}>
+                时间范围
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div className="lt-field">
                   <label className="lt-label" style={{ color: "var(--lt-ink-3)" }}>开始日期（可选）</label>
                   <input className="lt-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </div>
                 <div className="lt-field">
-                  <label className="lt-label">到期日期</label>
+                  <label className="lt-label">结束日期</label>
                   <input className="lt-input" type="date" value={expireDate} onChange={(e) => setExpireDate(e.target.value)} />
                 </div>
               </div>
@@ -1622,7 +1723,7 @@ function RenewModal({
   }, [item]);
 
   const handleSave = async () => {
-    if (!newExpireDate) { setError("请选择新到期日期"); return; }
+    if (!newExpireDate) { setError("请选择新结束日期"); return; }
     if (!item) return;
     setSaving(true); setError("");
     try {
@@ -1659,7 +1760,9 @@ function RenewModal({
 
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           <div style={{ background: "var(--lt-surface-2)", borderRadius: "12px", padding: "10px 14px", fontSize: "13px", color: "var(--lt-ink-3)" }}>
-            当前到期：<span style={{ fontWeight: 600, color: "var(--lt-ink-2)" }}>{item?.expireDate ? fmtDate(item.expireDate) : ""}</span>
+            当前时间范围：<span style={{ fontWeight: 600, color: "var(--lt-ink-2)" }}>
+              {item ? fmtDateRange(item.startDate, item.expireDate) : ""}
+            </span>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
@@ -1669,7 +1772,7 @@ function RenewModal({
                 onChange={(e) => setNewStartDate(e.target.value)} />
             </div>
             <div className="lt-field">
-              <label className="lt-label">新到期日期</label>
+              <label className="lt-label">新结束日期</label>
               <input className="lt-input" type="date" value={newExpireDate}
                 onChange={(e) => setNewExpireDate(e.target.value)} />
             </div>
@@ -1944,6 +2047,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
   const [logTarget, setLogTarget] = useState<ConsumptionItemDTO | null>(null);
   const [editTarget, setEditTarget] = useState<DeadlineItemDTO | ConsumptionItemDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [expandedCardKey, setExpandedCardKey] = useState<ExpandedCardKey>(null);
   const [deadlines, setDeadlines] = useState<DeadlineItemDTO[]>(() =>
     isDemo ? buildDemoDeadlines() : []
   );
@@ -1983,6 +2087,19 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
   useEffect(() => {
     if (!isDemo) load();
   }, [load, isDemo]);
+
+  const toggleDeadlineHistory = useCallback((id: number) => {
+    setExpandedCardKey((current) => current === `deadline:${id}` ? null : `deadline:${id}`);
+  }, []);
+
+  const toggleConsumptionHistory = useCallback((id: number) => {
+    setExpandedCardKey((current) => current === `consumption:${id}` ? null : `consumption:${id}`);
+  }, []);
+
+  const switchTab = (next: Tab) => {
+    setTab(next);
+    setExpandedCardKey(null);
+  };
 
   // ── Demo helpers ──────────────────────────────────────────────────────────
 
@@ -2104,7 +2221,10 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
           const renewals = demoRenewalsRef.current.get(id) ?? [];
           demoRenewalsRef.current.set(id, [{
             id: nextDemoId(), itemId: id, renewedAt: now,
-            oldExpireDate: item.expireDate, newExpireDate: body.newExpireDate,
+            oldStartDate: item.startDate,
+            oldExpireDate: item.expireDate,
+            newStartDate: body.newStartDate ?? item.expireDate,
+            newExpireDate: body.newExpireDate,
             notes: body.notes ?? null,
           }, ...renewals]);
           return {
@@ -2327,7 +2447,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
         {/* ── Tab Bar ── */}
         <div className="lt-tabs" style={{ marginBottom: "16px" }}>
           <button className={`lt-tab${tab === "deadline" ? " active" : ""}`}
-            onClick={() => setTab("deadline")}>
+            onClick={() => switchTab("deadline")}>
             到期提醒
             {deadlines.length > 0 && (
               <span style={{
@@ -2348,7 +2468,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
           </button>
 
           <button className={`lt-tab${tab === "consumption" ? " active" : ""}`}
-            onClick={() => setTab("consumption")}>
+            onClick={() => switchTab("consumption")}>
             消耗预估
             {consumptions.length > 0 && (
               <span style={{
@@ -2411,6 +2531,8 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
                 filteredDeadlines.map((item) => (
                   <DeadlineCard
                     key={item.id} item={item}
+                    expanded={expandedCardKey === `deadline:${item.id}`}
+                    onToggleHistory={toggleDeadlineHistory}
                     onRenew={setRenewTarget}
                     onEdit={setEditTarget}
                     onArchive={handleArchive}
@@ -2423,6 +2545,8 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
                 filteredConsumptions.map((item) => (
                   <ConsumptionCard
                     key={item.id} item={item}
+                    expanded={expandedCardKey === `consumption:${item.id}`}
+                    onToggleHistory={toggleConsumptionHistory}
                     onAddLog={setLogTarget}
                     onEdit={setEditTarget}
                     onArchive={handleArchive}

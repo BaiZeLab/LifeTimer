@@ -228,10 +228,15 @@ export async function getDeadlineRenewals(itemId: number): Promise<DeadlineRenew
     SELECT * FROM deadline_renewals WHERE item_id = ${itemId} ORDER BY renewed_at DESC
   ` as {
     id: number; item_id: number; renewed_at: string;
-    old_expire_date: string; new_expire_date: string; notes: string | null;
+    old_start_date: string | null; old_expire_date: string;
+    new_start_date: string | null; new_expire_date: string; notes: string | null;
   }[];
   return rows.map((r) => ({
     id: r.id, itemId: r.item_id, renewedAt: r.renewed_at,
-    oldExpireDate: r.old_expire_date, newExpireDate: r.new_expire_date, notes: r.notes,
+    oldStartDate: r.old_start_date,
+    oldExpireDate: r.old_expire_date,
+    newStartDate: r.new_start_date,
+    newExpireDate: r.new_expire_date,
+    notes: r.notes,
   }));
 }

@@ -32,7 +32,9 @@ export interface DeadlineRenewal {
   id: number;
   itemId: number;
   renewedAt: string;
+  oldStartDate: string | null;
   oldExpireDate: string;
+  newStartDate: string | null;
   newExpireDate: string;
   notes: string | null;
 }

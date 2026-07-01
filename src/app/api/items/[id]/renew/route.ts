@@ -34,8 +34,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   await sql.transaction((txSql) => [
     txSql`
-      INSERT INTO deadline_renewals (item_id, old_expire_date, new_expire_date, notes)
-      VALUES (${numId}, ${deadline.expire_date}, ${body.newExpireDate}, ${body.notes ?? null})
+      INSERT INTO deadline_renewals (
+        item_id, old_start_date, old_expire_date, new_start_date, new_expire_date, notes
+      )
+      VALUES (
+        ${numId}, ${deadline.start_date}, ${deadline.expire_date},
+        ${newStartDate}, ${body.newExpireDate}, ${body.notes ?? null}
+      )
     `,
     txSql`
       UPDATE deadline_items SET expire_date = ${body.newExpireDate}, start_date = ${newStartDate}
