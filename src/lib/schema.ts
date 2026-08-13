@@ -261,6 +261,44 @@ export async function migrate(): Promise<void> {
 
   await sql`CREATE INDEX IF NOT EXISTS idx_push_log_user_item ON push_log(user_id, item_id, sent_at)`;
 
+  // ── Webhook push tables ─────────────────────────────────────────────────
+  //
+  // Each user has exactly one webhook token (1:1). Regenerating rotates the
+  // token in-place so the old URL stops working immediately. The token itself
+  // is the only credential — no session/signature is required on the receive
+  // endpoint, by design (see /api/webhook/push/[token]).
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS webhook_tokens (
+      id            SERIAL      PRIMARY KEY,
+      user_id       TEXT        NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
+      token         TEXT        NOT NULL UNIQUE,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      rotated_at    TIMESTAMPTZ,
+      last_used_at  TIMESTAMPTZ
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_webhook_tokens_token ON webhook_tokens(token)`;
+
+  // Notification inbox: every webhook call is recorded here (regardless of
+  // whether a push subscription existed), so the /webhook page can act as a
+  // readable, copyable history even if the push itself never reached a device.
+  await sql`
+    CREATE TABLE IF NOT EXISTS webhook_log (
+      id          SERIAL      PRIMARY KEY,
+      user_id     TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      ip          TEXT,
+      title       TEXT        NOT NULL,
+      body        TEXT        NOT NULL,
+      status      TEXT        NOT NULL DEFAULT 'undelivered' CHECK (status IN ('sent','undelivered')),
+      delivered   INTEGER     NOT NULL DEFAULT 0,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_webhook_log_user_time ON webhook_log(user_id, created_at DESC)`;
+
   // ── PWA diagnostics log ───────────────────────────────────────────────────
   // Stores client-side diagnostic reports submitted from /pwa-check page.
   // No user_id FK because the page is public (user may not be logged in).

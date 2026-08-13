@@ -142,6 +142,16 @@ docker run -d \
 - 每小时 Cron 自动扫描：到期提醒提前 `alert_days` 天推送，每条目 20 小时内去重
 - 管理员可在 `/admin/users` 手动向全部或指定用户发送推送
 
+### Webhook 通知
+
+登录用户可在 `/webhook` 页面查看自己唯一的 Webhook 地址（`/api/webhook/push/<token>`），供第三方系统（家庭自动化、监控脚本、群晖任务计划等）主动推送通知：
+
+- 地址本身就是唯一凭证，**不做额外鉴权**（无需登录态、签名或额外请求头）；泄露后可在页面上一键重置，旧地址立即失效。
+- 支持 `GET`（query 参数）和 `POST`（JSON 或纯文本 body），兼容 `title`/`subject`、`body`/`text`/`message`/`content` 等常见字段别名。
+- 每次调用都会写入 `webhook_log` 并展示在页面下方的"通知记录"里，无论是否有设备成功收到推送——即使用户还没开启浏览器推送，也能在页面上看到并复制通知内容。
+- 点击系统推送通知会跳转到 `/webhook?highlight=<记录ID>`，自动定位并高亮对应的那条记录。
+- 内置轻量限流（每分钟 20 次 / 每小时 120 次）防止误用或脚本失控刷爆推送配额，这是防刷保护而非身份鉴权。
+
 ### Cloudflare 配置注意事项
 
 若站点前面有 Cloudflare CDN，**必须** 对以下路径禁用缓存（Page Rule 或 Cache Rule）：
@@ -198,6 +208,10 @@ consumption_logs (id, item_id, recorded_at, value, is_topup, is_anomaly, notes)
 -- Web Push
 push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
 push_log (id, user_id, item_id, sent_at)  -- 去重日志
+
+-- Webhook 通知（每用户唯一 token，可重置；日志兼作通知收件箱）
+webhook_tokens (id, user_id, token, created_at, rotated_at, last_used_at)
+webhook_log (id, user_id, ip, title, body, status, delivered, created_at)
 
 -- PWA 诊断
 pwa_diagnostics (id, user_agent, is_ios, ios_version, is_standalone,

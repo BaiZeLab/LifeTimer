@@ -6,7 +6,7 @@ import {
   Plus, Search, X, LayoutGrid, RefreshCw, RotateCcw, Trash2, PlusCircle,
   AlertTriangle, ChevronDown, ChevronUp, AlertCircle, Pencil, Archive,
   TrendingDown, MoreHorizontal, Timer, Gauge, LogOut, Settings, LogIn,
-  Sun, Moon, Bell, BellOff,
+  Sun, Moon, Bell, BellOff, Webhook,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
@@ -2027,7 +2027,13 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
   const { theme, toggle: toggleTheme } = useTheme();
 
   // ── Service Worker registration ───────────────────────────────────────────
+  //
+  // Skipped in development: sw.js cache-first's /_next/static/*, but dev-mode
+  // chunk URLs are stable (not content-hashed like prod builds), so any local
+  // code change gets silently masked by the old cached bundle until the SW is
+  // manually unregistered. Production keeps full PWA/offline/push behavior.
   useEffect(() => {
+    if (process.env.NODE_ENV === "development") return;
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch((e) =>
         console.warn("[sw]", e)
@@ -2355,12 +2361,16 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
               </div>
             )}
           </div>
-          <div style={{ display: "flex", gap: "8px", marginTop: "2px", alignItems: "center" }}>
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: "8px", rowGap: "8px",
+            marginTop: "2px", alignItems: "center", justifyContent: "flex-end",
+          }}>
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
               style={{
+                flexShrink: 0,
                 width: "44px", height: "44px", borderRadius: "9999px",
                 background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
                 border: "none", cursor: "pointer",
@@ -2381,6 +2391,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
                 disabled={pushLoading}
                 title={pushSubscribed ? "关闭推送通知" : "开启推送通知"}
                 style={{
+                  flexShrink: 0,
                   width: "44px", height: "44px", borderRadius: "9999px",
                   background: pushSubscribed ? "var(--lt-ink-1)" : "var(--lt-surface)",
                   boxShadow: "var(--lt-card-shadow)",
@@ -2397,11 +2408,29 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
               </button>
             )}
 
+            {/* Webhook notifications entry (authenticated only, independent of browser push support) */}
+            {!isDemo && user && (
+              <Link href="/webhook" title="Webhook 通知" style={{
+                flexShrink: 0,
+                width: "44px", height: "44px", borderRadius: "9999px",
+                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--lt-ink-3)", textDecoration: "none",
+                transition: "transform 120ms ease-out",
+              }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.07)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+              >
+                <Webhook size={18} strokeWidth={1.8} />
+              </Link>
+            )}
+
             {/* iOS Safari hint: push requires PWA (Home Screen) mode */}
             {!isDemo && user && iosNeedsPWA && (
               <button
                 title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
                 style={{
+                  flexShrink: 0,
                   width: "44px", height: "44px", borderRadius: "9999px",
                   background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
                   border: "1.5px dashed var(--lt-border)", cursor: "default",
@@ -2416,6 +2445,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
 
             {!isDemo && (
               <Link href="/archived" style={{
+                flexShrink: 0,
                 width: "44px", height: "44px", borderRadius: "9999px",
                 background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -2427,6 +2457,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
             <button
               onClick={() => setModalOpen(true)}
               style={{
+                flexShrink: 0,
                 width: "44px", height: "44px", borderRadius: "9999px",
                 background: "var(--lt-fab-bg)", border: "none",
                 cursor: "pointer",

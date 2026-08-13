@@ -66,6 +66,7 @@ export async function proxy(request: NextRequest) {
     pathname === "/sw.js" ||               // Service Worker — required for push & offline
     pathname.startsWith("/icons/") ||      // PWA icons — required for home screen icon
     pathname.startsWith("/api/push/") ||    // VAPID public key endpoint (needed before login)
+    pathname.startsWith("/api/webhook/push/") || // Webhook receive endpoint — token in the URL is its own credential
     pathname === "/api/cron" ||             // Cron job — has its own CRON_SECRET / localhost auth
     pathname === "/pwa-check" ||            // Public PWA diagnostics page
     pathname === "/api/pwa-check"           // Diagnostics report collector (unauthenticated POST)
