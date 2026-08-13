@@ -2336,7 +2336,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
         )}
 
         {/* ── Page Header ── */}
-        <div style={{ padding: isDemo ? "28px 0 24px" : "32px 0 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div className="lt-home-header" style={{ padding: isDemo ? "28px 0 24px" : "32px 0 24px" }}>
           <div>
             <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--lt-ink-1)", letterSpacing: "-0.025em", lineHeight: 1.1, margin: 0 }}>
               Life Timer
@@ -2361,10 +2361,7 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
               </div>
             )}
           </div>
-          <div style={{
-            display: "flex", flexWrap: "wrap", gap: "8px", rowGap: "8px",
-            marginTop: "2px", alignItems: "center", justifyContent: "flex-end",
-          }}>
+          <div className="lt-home-header-actions" style={{ marginTop: "2px" }}>
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}

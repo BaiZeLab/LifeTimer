@@ -10,7 +10,7 @@
 
 // Bump this version whenever sw.js logic changes to force all clients to
 // activate the new worker and clear the old cache.
-const CACHE_VERSION = "lt-v2";
+const CACHE_VERSION = "lt-v3";
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 
 const PRECACHE_URLS = [

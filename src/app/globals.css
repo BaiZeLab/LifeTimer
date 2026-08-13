@@ -398,6 +398,32 @@ body {
   .lt-fab { display: flex; }
 }
 
+/* ─── Home page header (responsive) ──────────────────────────────
+ * Title and action-icon row compete for horizontal space on narrow
+ * screens. Stacking them on mobile (instead of squeezing side by side)
+ * keeps the title from wrapping and gives the icon row its full width
+ * so all icons stay in one line at full 44px touch size. */
+.lt-home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.lt-home-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .lt-home-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ─── Danger hover background (adapts to theme) ────────────────── */
 :root { --lt-danger-hover-bg: oklch(97% 0.018 30); }
 

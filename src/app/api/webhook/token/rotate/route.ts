@@ -3,6 +3,8 @@
  *
  * Regenerates the current user's webhook token. The old URL stops working
  * immediately — any third-party integration using it must be updated.
+ * Returns only the new token; the frontend rebuilds the full URL using
+ * `window.location.origin` (see /api/webhook/token for why).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +16,6 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const row = await rotateWebhookToken(session.user.id);
-  const origin = req.nextUrl.origin;
 
-  return NextResponse.json({ url: `${origin}/api/webhook/push/${row.token}` });
+  return NextResponse.json({ token: row.token });
 }

@@ -271,13 +271,19 @@ function WebhookPageInner() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
 
+  // The backend only ever returns the bare token — the origin is always taken
+  // from the browser's own address bar so the displayed URL matches exactly
+  // what the user is visiting, even behind a reverse proxy / CDN that might
+  // otherwise make the server see the wrong host or scheme.
+  const buildUrl = (token: string) => `${window.location.origin}/api/webhook/push/${token}`;
+
   const loadUrl = useCallback(async () => {
     setUrlLoading(true);
     try {
       const res = await fetch("/api/webhook/token");
       if (res.ok) {
         const data = await res.json();
-        setUrl(data.url);
+        setUrl(buildUrl(data.token));
       }
     } finally {
       setUrlLoading(false);
@@ -300,7 +306,7 @@ function WebhookPageInner() {
     const res = await fetch("/api/webhook/token/rotate", { method: "POST" });
     if (res.ok) {
       const data = await res.json();
-      setUrl(data.url);
+      setUrl(buildUrl(data.token));
     }
   }, []);
 
