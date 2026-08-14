@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PushNavigationHandler } from "@/components/PushNavigationHandler";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -73,6 +74,7 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
         <meta name="theme-color" content="#F1EBDF" />
       </head>
       <body>
+        <PushNavigationHandler />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

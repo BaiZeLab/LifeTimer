@@ -10,8 +10,11 @@
 
 // Bump this version whenever sw.js logic changes to force all clients to
 // activate the new worker and clear the old cache.
-const CACHE_VERSION = "lt-v4";
+const CACHE_VERSION = "lt-v5";
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
+// Not version-bound — a single small dead-drop entry, not a versioned asset
+// cache, so it must survive the activate-time cleanup below.
+const NAV_CACHE = "lt-pending-nav";
 
 const PRECACHE_URLS = [
   "/",
@@ -40,7 +43,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith("lt-") && k !== STATIC_CACHE)
+            .filter((k) => k.startsWith("lt-") && k !== STATIC_CACHE && k !== NAV_CACHE)
             .map((k) => caches.delete(k))
         )
       )
@@ -129,30 +132,53 @@ self.addEventListener("push", (event) => {
 });
 
 // ── Notification click ────────────────────────────────────────────────────────
+//
+// WindowClient.navigate() is unreliable across browsers for this (throws or
+// silently no-ops in some states — see webkit.org bug tracking), so an
+// existing window is redirected via postMessage instead; the page listens
+// and does the actual navigation client-side. iOS Safari has a further,
+// still-unfixed bug: when the PWA was fully closed, clients.openWindow(url)
+// sometimes ignores `url` entirely and reopens start_url. NAV_CACHE is a
+// same-origin dead-drop the freshly-opened page reads on boot to recover the
+// intended destination in that case (see PushNavigationHandler component).
+const NAV_KEY = "/__pending-nav__";
+
+async function rememberPendingNav(url) {
+  try {
+    const cache = await caches.open(NAV_CACHE);
+    await cache.put(NAV_KEY, new Response(JSON.stringify({ url, ts: Date.now() })));
+  } catch {
+    // Cache Storage unavailable (e.g. private mode) — the postMessage /
+    // openWindow paths below still cover the common cases.
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   if (event.action === "dismiss") return;
 
-  const targetUrl = event.notification.data?.url ?? "/";
+  const targetUrl = new URL(event.notification.data?.url ?? "/", self.location.origin).href;
 
   event.waitUntil(
-    self.clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clients) => {
-        for (const client of clients) {
-          if (client.url.includes(self.location.origin) && "focus" in client) {
-            // navigate() must be awaited before returning — otherwise the
-            // event's waitUntil promise can resolve (via focus()) before the
-            // navigation actually completes, and the SW may be torn down
-            // mid-navigation, leaving the window focused on whatever page it
-            // already had open (typically "/") instead of the target URL.
-            return client.navigate(targetUrl)
-              .then((navigated) => (navigated || client).focus())
-              .catch(() => client.focus());
-          }
+    (async () => {
+      await rememberPendingNav(targetUrl);
+
+      const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const existing = windowClients.find((c) => c.url.startsWith(self.location.origin));
+
+      if (existing) {
+        existing.postMessage({ type: "lt-navigate", url: targetUrl });
+        try {
+          await existing.focus();
+        } catch {
+          // iOS can throw "focus failed" right as a killed PWA relaunches;
+          // the message above and the NAV_CACHE fallback still apply once
+          // the page settles.
         }
-        return self.clients.openWindow(targetUrl);
-      })
+        return;
+      }
+
+      return self.clients.openWindow(targetUrl);
+    })()
   );
 });
