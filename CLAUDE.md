@@ -84,6 +84,8 @@ node scripts/generate-icons.js
 
 ### 推送通知
 
+- 主页头部的推送/webhook 是同一个图标：未订阅时点击直接触发订阅流程，不跳转页面；订阅成功后图标切换为跳转 `/webhook` 的链接。取消订阅只能在 `/webhook` 页面完成，主页图标不再提供取消订阅的交互，避免图标数量和状态语义膨胀。
+- `usePushSubscription` hook 定义在 `src/lib/use-push-subscription.ts`，供主页与 `/webhook` 页面共用，不要在两处各自维护一份订阅逻辑。
 - Cron 每小时执行一次，推送日志按 20 小时去重。
 - 只有实际发送成功后才写入 `push_log`。
 - 用户多设备订阅需要保留，订阅清理不能按 push host 粗暴删除。

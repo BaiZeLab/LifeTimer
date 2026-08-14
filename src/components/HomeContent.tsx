@@ -6,7 +6,7 @@ import {
   Plus, Search, X, LayoutGrid, RefreshCw, RotateCcw, Trash2, PlusCircle,
   AlertTriangle, ChevronDown, ChevronUp, AlertCircle, Pencil, Archive,
   TrendingDown, MoreHorizontal, Timer, Gauge, LogOut, Settings, LogIn,
-  Sun, Moon, Bell, BellOff, Webhook,
+  Sun, Moon, BellOff, Webhook,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import type {
   ItemStatus, CreateItemBody, PatchItemBody, RenewBody, CreateLogBody, PatchLogBody,
 } from "@/types/api";
 import { useSession, signOut } from "@/lib/auth-client";
+import { usePushSubscription } from "@/lib/use-push-subscription";
 import { calcDeadlineMetrics, calcConsumptionEstimate } from "@/lib/algorithms";
 import type { LogRow } from "@/lib/algorithms";
 import {
@@ -415,56 +416,6 @@ function OverflowMenu({ onArchive, onDelete }: { onArchive: () => void; onDelete
       </div>
       {dropdown}
     </>
-  );
-}
-
-// ── HeaderMenu ────────────────────────────────────────────────────────────────
-// Collapses secondary header actions (webhook, archived, iOS hint) into a single
-// 44px trigger so the icon row never competes with the title for space.
-
-function HeaderMenu({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent | TouchEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("touchstart", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("touchstart", close);
-    };
-  }, [open]);
-
-  return (
-    <div className="lt-header-menu" ref={wrapRef}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="更多"
-        style={{
-          flexShrink: 0,
-          width: "44px", height: "44px", borderRadius: "9999px",
-          background: open ? "var(--lt-surface-2)" : "var(--lt-surface)",
-          boxShadow: "var(--lt-card-shadow)",
-          border: "none", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "var(--lt-ink-3)",
-          transition: "transform 120ms ease-out, background 120ms ease-out",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        <MoreHorizontal size={18} strokeWidth={1.8} />
-      </button>
-      {open && (
-        <div className="lt-header-menu-dropdown" onClick={() => setOpen(false)}>
-          {children}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1980,112 +1931,6 @@ function EmptyState({ isSearch, tab }: { isSearch: boolean; tab: Tab }) {
   );
 }
 
-// ── Push helpers ──────────────────────────────────────────────────────────────
-
-/**
- * Convert a base64url-encoded VAPID public key to a Uint8Array.
- * The Web Push spec requires a BufferSource for applicationServerKey;
- * passing a raw string works in Chrome 67+ but fails in older/non-Chrome engines.
- */
-function urlBase64ToUint8Array(base64: string): ArrayBuffer {
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  const b64    = padded.replace(/-/g, "+").replace(/_/g, "/");
-  const raw    = atob(b64);
-  const arr    = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-  return arr.buffer;
-}
-
-// ── usePushSubscription ───────────────────────────────────────────────────────
-
-function usePushSubscription(enabled: boolean) {
-  const [subscribed,   setSubscribed]   = useState(false);
-  const [loading,      setLoading]      = useState(false);
-  const [supported,    setSupported]    = useState(false);
-  // True when on iOS Safari in browser mode (not installed as PWA)
-  const [iosNeedsPWA,  setIosNeedsPWA]  = useState(false);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window as { MSStream?: unknown }).MSStream;
-    const isStandalone =
-      (navigator as { standalone?: boolean }).standalone === true ||
-      window.matchMedia("(display-mode: standalone)").matches;
-
-    // On iOS, Web Push only works from an installed PWA (Home Screen icon).
-    // Show a hint instead of an unusable button when in browser mode.
-    if (isIos && !isStandalone) {
-      setIosNeedsPWA(true);
-      return;
-    }
-
-    const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-    setSupported(ok);
-    if (!ok) return;
-
-    // Check if already subscribed
-    navigator.serviceWorker.ready.then(async (reg) => {
-      const sub = await reg.pushManager.getSubscription();
-      setSubscribed(!!sub);
-    });
-  }, [enabled]);
-
-  const toggle = useCallback(async () => {
-    if (!supported || loading) return;
-    setLoading(true);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-
-      if (subscribed) {
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await fetch("/api/push/subscribe", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          });
-          await sub.unsubscribe();
-        }
-        setSubscribed(false);
-        return;
-      }
-
-      // Request permission
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") return;
-
-      // Fetch VAPID public key
-      const res = await fetch("/api/push/subscribe");
-      const { enabled: pushEnabled, publicKey } = await res.json();
-      if (!pushEnabled || !publicKey) return;
-
-      // Subscribe — convert to Uint8Array for maximum browser compatibility
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-
-      const json = sub.toJSON() as {
-        endpoint: string;
-        keys: { p256dh: string; auth: string };
-      };
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(json),
-      });
-      setSubscribed(true);
-    } catch (e) {
-      console.error("[push]", e);
-    } finally {
-      setLoading(false);
-    }
-  }, [supported, subscribed, loading]);
-
-  return { subscribed, loading, supported, iosNeedsPWA, toggle };
-}
-
 // ── HomeContent ───────────────────────────────────────────────────────────────
 
 export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
@@ -2408,168 +2253,138 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
 
         {/* ── Page Header ── */}
         <div className="lt-home-header" style={{ padding: isDemo ? "28px 0 24px" : "32px 0 24px" }}>
-          <div className="lt-home-header-row">
+          <div>
             <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--lt-ink-1)", letterSpacing: "-0.025em", lineHeight: 1.1, margin: 0 }}>
               Life Timer
             </h1>
-            <div className="lt-home-header-actions">
-              {/* Theme toggle */}
-              <button
-                onClick={toggleTheme}
-                title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
-                style={{
-                  flexShrink: 0,
-                  width: "44px", height: "44px", borderRadius: "9999px",
-                  background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                  border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "var(--lt-ink-3)",
-                  transition: "transform 120ms ease-out",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
-              </button>
-
-              {/* Add item (primary action, always visible) */}
-              <button
-                onClick={() => setModalOpen(true)}
-                style={{
-                  flexShrink: 0,
-                  width: "44px", height: "44px", borderRadius: "9999px",
-                  background: "var(--lt-fab-bg)", border: "none",
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "var(--lt-fab-color)",
-                  boxShadow: "var(--lt-shadow-fab)",
-                  transition: "transform 120ms ease-out, filter 120ms ease-out",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                aria-label="新增物品"
-              >
-                <Plus size={20} strokeWidth={2.5} />
-              </button>
-            </div>
+            {!isDemo && user && (
+              <div className="lt-user-badge" style={{ marginTop: "6px" }}>
+                <span className="lt-user-badge-name">{user.name}</span>
+                {isAdmin && (
+                  <Link href="/admin/users" title="用户管理"
+                    style={{ color: "var(--lt-ink-3)", display: "flex", alignItems: "center" }}>
+                    <Settings size={13} strokeWidth={1.8} />
+                  </Link>
+                )}
+                <button
+                  className="lt-signout-btn"
+                  onClick={() => signOut().then(() => (window.location.href = "/auth/login"))}
+                  title="退出登录"
+                >
+                  <LogOut size={12} strokeWidth={2} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />
+                  退出
+                </button>
+              </div>
+            )}
           </div>
 
-          {!isDemo && (
-            <div className="lt-home-header-row lt-home-header-row--secondary">
-              {user ? (
-                <div className="lt-user-badge">
-                  <span className="lt-user-badge-name">{user.name}</span>
-                  {isAdmin && (
-                    <Link href="/admin/users" title="用户管理"
-                      style={{ color: "var(--lt-ink-3)", display: "flex", alignItems: "center" }}>
-                      <Settings size={13} strokeWidth={1.8} />
-                    </Link>
-                  )}
-                  <button
-                    className="lt-signout-btn"
-                    onClick={() => signOut().then(() => (window.location.href = "/auth/login"))}
-                    title="退出登录"
-                  >
-                    <LogOut size={12} strokeWidth={2} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />
-                    退出
-                  </button>
-                </div>
-              ) : <div />}
+          <div className="lt-home-header-actions">
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+              style={{
+                flexShrink: 0,
+                width: "44px", height: "44px", borderRadius: "9999px",
+                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--lt-ink-3)",
+                transition: "transform 120ms ease-out",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
+            </button>
 
-              <div className="lt-home-header-actions">
-                {/* Push notification toggle (authenticated + supported) */}
-                {user && pushSupported && (
-                  <button
-                    onClick={togglePush}
-                    disabled={pushLoading}
-                    title={pushSubscribed ? "关闭推送通知" : "开启推送通知"}
-                    style={{
-                      flexShrink: 0,
-                      width: "44px", height: "44px", borderRadius: "9999px",
-                      background: pushSubscribed ? "var(--lt-ink-1)" : "var(--lt-surface)",
-                      boxShadow: "var(--lt-card-shadow)",
-                      border: "none", cursor: pushLoading ? "default" : "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: pushSubscribed ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
-                      opacity: pushLoading ? 0.6 : 1,
-                      transition: "transform 120ms ease-out, background 180ms ease-out",
-                    }}
-                    onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.transform = "scale(1.07)"; }}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  >
-                    {pushSubscribed ? <Bell size={18} strokeWidth={1.8} /> : <BellOff size={18} strokeWidth={1.8} />}
-                  </button>
-                )}
-
-                {/* Desktop: shown directly, plenty of room in the row */}
-                {user && (
-                  <Link href="/webhook" title="Webhook 通知" className="lt-header-inline-only" style={{
-                    flexShrink: 0,
-                    width: "44px", height: "44px", borderRadius: "9999px",
-                    background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "var(--lt-ink-3)", textDecoration: "none",
-                    transition: "transform 120ms ease-out",
-                  }}
-                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.07)")}
-                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
-                  >
-                    <Webhook size={18} strokeWidth={1.8} />
-                  </Link>
-                )}
-                <Link href="/archived" title="已归档" className="lt-header-inline-only" style={{
+            {/* Notification: subscribe when off, links to /webhook (history + unsubscribe) once on */}
+            {!isDemo && user && pushSupported && !pushSubscribed && (
+              <button
+                onClick={togglePush}
+                disabled={pushLoading}
+                title="开启推送通知"
+                style={{
                   flexShrink: 0,
                   width: "44px", height: "44px", borderRadius: "9999px",
                   background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                  border: "none", cursor: pushLoading ? "default" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "var(--lt-ink-3)", textDecoration: "none",
-                }}>
-                  <Archive size={18} strokeWidth={1.8} />
-                </Link>
-                {user && iosNeedsPWA && (
-                  <button
-                    title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
-                    className="lt-header-inline-only"
-                    style={{
-                      flexShrink: 0,
-                      width: "44px", height: "44px", borderRadius: "9999px",
-                      background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                      border: "1.5px dashed var(--lt-border)", cursor: "default",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "var(--lt-ink-4)",
-                    }}
-                    onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
-                  >
-                    <BellOff size={18} strokeWidth={1.5} />
-                  </button>
-                )}
+                  color: "var(--lt-ink-3)",
+                  opacity: pushLoading ? 0.6 : 1,
+                  transition: "transform 120ms ease-out",
+                }}
+                onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.transform = "scale(1.07)"; }}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <BellOff size={18} strokeWidth={1.8} />
+              </button>
+            )}
+            {!isDemo && user && pushSupported && pushSubscribed && (
+              <Link href="/webhook" title="通知" style={{
+                flexShrink: 0,
+                width: "44px", height: "44px", borderRadius: "9999px",
+                background: "var(--lt-ink-1)", boxShadow: "var(--lt-card-shadow)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--lt-on-ink)", textDecoration: "none",
+                transition: "transform 120ms ease-out",
+              }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.07)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+              >
+                <Webhook size={18} strokeWidth={1.8} />
+              </Link>
+            )}
+            {!isDemo && user && iosNeedsPWA && (
+              <button
+                title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
+                style={{
+                  flexShrink: 0,
+                  width: "44px", height: "44px", borderRadius: "9999px",
+                  background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                  border: "1.5px dashed var(--lt-border)", cursor: "default",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--lt-ink-4)",
+                }}
+                onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
+              >
+                <BellOff size={18} strokeWidth={1.5} />
+              </button>
+            )}
 
-                {/* Mobile: collapsed into one menu so the row never wraps */}
-                <HeaderMenu>
-                  {user && (
-                    <Link href="/webhook" className="lt-header-menu-item">
-                      <span className="lt-header-menu-item-icon"><Webhook size={15} strokeWidth={1.8} /></span>
-                      Webhook 通知
-                    </Link>
-                  )}
-                  <Link href="/archived" className="lt-header-menu-item">
-                    <span className="lt-header-menu-item-icon"><Archive size={15} strokeWidth={1.8} /></span>
-                    已归档
-                  </Link>
-                  {user && iosNeedsPWA && (
-                    <button
-                      type="button"
-                      className="lt-header-menu-item"
-                      onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
-                    >
-                      <span className="lt-header-menu-item-icon"><BellOff size={15} strokeWidth={1.5} /></span>
-                      添加到主屏幕启用推送
-                    </button>
-                  )}
-                </HeaderMenu>
-              </div>
-            </div>
-          )}
+            {/* Archive */}
+            {!isDemo && (
+              <Link href="/archived" title="已归档" style={{
+                flexShrink: 0,
+                width: "44px", height: "44px", borderRadius: "9999px",
+                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--lt-ink-3)", textDecoration: "none",
+              }}>
+                <Archive size={18} strokeWidth={1.8} />
+              </Link>
+            )}
+
+            {/* Add item (primary action, always visible) */}
+            <button
+              onClick={() => setModalOpen(true)}
+              style={{
+                flexShrink: 0,
+                width: "44px", height: "44px", borderRadius: "9999px",
+                background: "var(--lt-fab-bg)", border: "none",
+                cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--lt-fab-color)",
+                boxShadow: "var(--lt-shadow-fab)",
+                transition: "transform 120ms ease-out, filter 120ms ease-out",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              aria-label="新增物品"
+            >
+              <Plus size={20} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
         {/* ── Tab Bar ── */}

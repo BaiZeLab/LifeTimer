@@ -138,13 +138,13 @@ docker run -d \
 
 ### Web Push 通知
 
-- 用户在主页点击铃铛图标授权，订阅信息存入 `push_subscriptions` 表
+- 主页头部只有一个通知图标：未订阅时点击即触发浏览器授权并订阅，订阅信息存入 `push_subscriptions` 表；订阅成功后同一个图标切换为跳转 `/webhook` 页面的入口。取消订阅需在 `/webhook` 页面完成，主页图标不再承担取消订阅的职责。
 - 每小时 Cron 自动扫描：到期提醒提前 `alert_days` 天推送，每条目 20 小时内去重
 - 管理员可在 `/admin/users` 手动向全部或指定用户发送推送
 
 ### Webhook 通知
 
-登录用户可在 `/webhook` 页面查看自己唯一的 Webhook 地址（`/api/webhook/push/<token>`），供第三方系统（家庭自动化、监控脚本、群晖任务计划等）主动推送通知：
+登录用户可在 `/webhook` 页面查看自己唯一的 Webhook 地址（`/api/webhook/push/<token>`），供第三方系统（家庭自动化、监控脚本、群晖任务计划等）主动推送通知；该页面同时承载 Web Push 的取消订阅入口，未订阅推送时也可直接访问查看地址与历史记录：
 
 - 地址本身就是唯一凭证，**不做额外鉴权**（无需登录态、签名或额外请求头）；泄露后可在页面上一键重置，旧地址立即失效。
 - 支持 `GET`（query 参数）和 `POST`（JSON 或纯文本 body），兼容 `title`/`subject`、`body`/`text`/`message`/`content` 等常见字段别名。

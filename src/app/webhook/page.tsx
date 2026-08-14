@@ -7,6 +7,7 @@ import {
   ArrowLeft, Copy, Check, Eye, EyeOff, RotateCw, Webhook as WebhookIcon,
   Inbox, RefreshCw, BellRing, BellOff,
 } from "lucide-react";
+import { usePushSubscription } from "@/lib/use-push-subscription";
 
 interface LogEntry {
   id: number;
@@ -196,6 +197,63 @@ function WebhookUrlCard({
   );
 }
 
+// ── PushSubscriptionCard ──────────────────────────────────────────────────────
+// Subscribing lives on the home header (bell icon); unsubscribing lives here so
+// the header only ever needs one notification-related icon.
+
+function PushSubscriptionCard() {
+  const { subscribed, loading, supported, iosNeedsPWA, toggle } = usePushSubscription(true);
+
+  if (!supported && !iosNeedsPWA) return null;
+
+  return (
+    <div style={{
+      background: "var(--lt-surface)", borderRadius: "18px", padding: "16px 20px",
+      boxShadow: "var(--lt-card-shadow)", marginBottom: "16px",
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{
+          width: "36px", height: "36px", borderRadius: "9999px", flexShrink: 0,
+          background: subscribed ? "var(--lt-ink-1)" : "var(--lt-surface-2)",
+          color: subscribed ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {subscribed ? <BellRing size={16} strokeWidth={1.8} /> : <BellOff size={16} strokeWidth={1.8} />}
+        </div>
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--lt-ink-1)" }}>
+            推送通知{iosNeedsPWA ? "" : subscribed ? "已开启" : "未开启"}
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--lt-ink-4)", marginTop: "2px" }}>
+            {iosNeedsPWA
+              ? "iOS 需先添加到主屏幕（分享 → 添加到主屏幕）才能启用"
+              : subscribed
+                ? "本设备将实时收到 webhook 推送提醒"
+                : "开启后本设备才能收到 webhook 推送提醒"}
+          </div>
+        </div>
+      </div>
+      {!iosNeedsPWA && (
+        <button
+          onClick={toggle}
+          disabled={loading}
+          style={{
+            flexShrink: 0, padding: "7px 14px", borderRadius: "9px",
+            border: subscribed ? "1px solid var(--lt-border)" : "none",
+            background: subscribed ? "transparent" : "var(--lt-ink-1)",
+            color: subscribed ? "var(--lt-ink-3)" : "var(--lt-on-ink)",
+            fontSize: "12.5px", fontWeight: 700, cursor: loading ? "default" : "pointer",
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? "处理中…" : subscribed ? "关闭推送" : "开启推送"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── LogCard ───────────────────────────────────────────────────────────────────
 
 function LogCard({ entry, highlighted }: { entry: LogEntry; highlighted: boolean }) {
@@ -335,6 +393,9 @@ function WebhookPageInner() {
           </p>
         </div>
       </div>
+
+      {/* Push subscription (unsubscribe lives here; subscribing is on the home header) */}
+      <PushSubscriptionCard />
 
       {/* URL management */}
       <WebhookUrlCard url={url} loading={urlLoading} onRotate={handleRotate} />
