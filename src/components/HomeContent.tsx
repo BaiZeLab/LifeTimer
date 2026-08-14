@@ -79,9 +79,9 @@ async function fetchItems<T>(type: Tab): Promise<T[]> {
 // ── Visual config ─────────────────────────────────────────────────────────────
 
 const BAR_COLOR: Record<ItemStatus, string> = {
-  ok:      "oklch(78% 0.165 135)",
-  warning: "oklch(67% 0.185 65)",
-  danger:  "oklch(59% 0.220 27)",
+  ok:      "var(--lt-ok)",
+  warning: "var(--lt-warn)",
+  danger:  "var(--lt-danger)",
   expired: "var(--lt-expired-color)",
 };
 
@@ -93,6 +93,18 @@ const BADGE_CFG: Record<ItemStatus, { arcColor: string; numColor: string; labelC
 };
 
 // ── DayBadge ──────────────────────────────────────────────────────────────────
+
+// Quarter-mark ticks just outside the track ring — the same fixed reading
+// grid as the status bar below, so "about a quarter left" reads instantly
+// without following the arc all the way around. Static, not part of the
+// animated value, like the printed marks on a real meter face.
+const TICK_R1 = 31, TICK_R2 = 34;
+const TICK_POINTS: Array<{ x1: number; y1: number; x2: number; y2: number }> = [
+  { x1: 0, y1: -TICK_R1, x2: 0, y2: -TICK_R2 },   // 100% — top
+  { x1: TICK_R1, y1: 0, x2: TICK_R2, y2: 0 },     // 75%  — right
+  { x1: 0, y1: TICK_R1, x2: 0, y2: TICK_R2 },     // 50%  — bottom
+  { x1: -TICK_R1, y1: 0, x2: -TICK_R2, y2: 0 },   // 25%  — left
+];
 
 function DayBadge({ daysLeft, status, pct }: { daysLeft: number; status: ItemStatus; pct: number }) {
   const cfg = BADGE_CFG[status];
@@ -112,6 +124,12 @@ function DayBadge({ daysLeft, status, pct }: { daysLeft: number; status: ItemSta
     <div style={{ position: "relative", width: `${SIZE}px`, height: `${SIZE}px`, flexShrink: 0 }}>
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}
         style={{ position: "absolute", inset: 0 }}>
+        <g transform={`translate(${CX} ${CY})`}>
+          {TICK_POINTS.map((t, i) => (
+            <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+              stroke="var(--lt-tick)" strokeWidth="1.5" strokeLinecap="round" />
+          ))}
+        </g>
         <circle cx={CX} cy={CY} r={R} fill="none"
           stroke="var(--lt-track)" strokeWidth="3.5" />
         {status === "expired" ? (
@@ -235,6 +253,9 @@ function StatusSummary({ items }: { items: Array<{ status: ItemStatus }> }) {
             background: s.color,
           }} />
         ))}
+        {[25, 50, 75].map((mark) => (
+          <div key={mark} className="lt-status-tick" style={{ left: `${mark}%` }} />
+        ))}
       </div>
     </div>
   );
@@ -357,7 +378,7 @@ function OverflowMenu({ onArchive, onDelete }: { onArchive: () => void; onDelete
       right: pos.right,
       background: "var(--lt-surface)",
       borderRadius: "12px",
-      boxShadow: "0 4px 20px oklch(17% 0.04 263 / 0.18), 0 1px 4px oklch(17% 0.04 263 / 0.10)",
+      boxShadow: "0 4px 20px oklch(16% 0.040 46 / 0.18), 0 1px 4px oklch(16% 0.040 46 / 0.10)",
       padding: "5px",
       minWidth: "108px",
       zIndex: 9999,
@@ -394,6 +415,56 @@ function OverflowMenu({ onArchive, onDelete }: { onArchive: () => void; onDelete
       </div>
       {dropdown}
     </>
+  );
+}
+
+// ── HeaderMenu ────────────────────────────────────────────────────────────────
+// Collapses secondary header actions (webhook, archived, iOS hint) into a single
+// 44px trigger so the icon row never competes with the title for space.
+
+function HeaderMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [open]);
+
+  return (
+    <div className="lt-header-menu" ref={wrapRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="更多"
+        style={{
+          flexShrink: 0,
+          width: "44px", height: "44px", borderRadius: "9999px",
+          background: open ? "var(--lt-surface-2)" : "var(--lt-surface)",
+          boxShadow: "var(--lt-card-shadow)",
+          border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "var(--lt-ink-3)",
+          transition: "transform 120ms ease-out, background 120ms ease-out",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      >
+        <MoreHorizontal size={18} strokeWidth={1.8} />
+      </button>
+      {open && (
+        <div className="lt-header-menu-dropdown" onClick={() => setOpen(false)}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -614,10 +685,10 @@ function ConsumptionHeatmap({ logs, unit, status }: {
 // ── ConsumptionChart ──────────────────────────────────────────────────────────
 
 const CHART_LINE_COLOR: Record<ItemStatus, string> = {
-  ok:      "oklch(52% 0.140 155)",
-  warning: "oklch(52% 0.165 65)",
-  danger:  "oklch(53% 0.200 27)",
-  expired: "oklch(45% 0.020 263)",
+  ok:      "var(--lt-ok-deep)",
+  warning: "var(--lt-warn-deep)",
+  danger:  "var(--lt-danger-deep)",
+  expired: "var(--lt-expired-deep)",
 };
 
 function buildBezierPath(pts: { x: number; y: number }[]): string {
@@ -1337,7 +1408,7 @@ function ConsumptionCard({
                       <span style={{ fontSize: "12px", color: "var(--lt-ink-4)" }}>{item.unit}</span>
                       {log.isTopup && (
                         <span style={{
-                          fontSize: "10px", fontWeight: 700, color: "oklch(40% 0.030 160)",
+                          fontSize: "10px", fontWeight: 700, color: "var(--lt-ok-deep)",
                           background: "var(--lt-tag-bg)", padding: "1px 6px", borderRadius: "9999px",
                         }}>充值</span>
                       )}
@@ -2337,139 +2408,168 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
 
         {/* ── Page Header ── */}
         <div className="lt-home-header" style={{ padding: isDemo ? "28px 0 24px" : "32px 0 24px" }}>
-          <div>
+          <div className="lt-home-header-row">
             <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--lt-ink-1)", letterSpacing: "-0.025em", lineHeight: 1.1, margin: 0 }}>
               Life Timer
             </h1>
-            {user && (
-              <div className="lt-user-badge" style={{ marginTop: "6px" }}>
-                <span className="lt-user-badge-name">{user.name}</span>
-                {isAdmin && (
-                  <Link href="/admin/users" title="用户管理"
-                    style={{ color: "var(--lt-ink-3)", display: "flex", alignItems: "center" }}>
-                    <Settings size={13} strokeWidth={1.8} />
-                  </Link>
-                )}
-                <button
-                  className="lt-signout-btn"
-                  onClick={() => signOut().then(() => (window.location.href = "/auth/login"))}
-                  title="退出登录"
-                >
-                  <LogOut size={12} strokeWidth={2} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />
-                  退出
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="lt-home-header-actions" style={{ marginTop: "2px" }}>
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
-              style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-ink-3)",
-                transition: "transform 120ms ease-out",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
-            </button>
-
-            {/* Push notification toggle (authenticated + supported) */}
-            {!isDemo && user && pushSupported && (
+            <div className="lt-home-header-actions">
+              {/* Theme toggle */}
               <button
-                onClick={togglePush}
-                disabled={pushLoading}
-                title={pushSubscribed ? "关闭推送通知" : "开启推送通知"}
-                style={{
-                  flexShrink: 0,
-                  width: "44px", height: "44px", borderRadius: "9999px",
-                  background: pushSubscribed ? "var(--lt-ink-1)" : "var(--lt-surface)",
-                  boxShadow: "var(--lt-card-shadow)",
-                  border: "none", cursor: pushLoading ? "default" : "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: pushSubscribed ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
-                  opacity: pushLoading ? 0.6 : 1,
-                  transition: "transform 120ms ease-out, background 180ms ease-out",
-                }}
-                onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.transform = "scale(1.07)"; }}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                {pushSubscribed ? <Bell size={18} strokeWidth={1.8} /> : <BellOff size={18} strokeWidth={1.8} />}
-              </button>
-            )}
-
-            {/* Webhook notifications entry (authenticated only, independent of browser push support) */}
-            {!isDemo && user && (
-              <Link href="/webhook" title="Webhook 通知" style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-ink-3)", textDecoration: "none",
-                transition: "transform 120ms ease-out",
-              }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.07)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
-              >
-                <Webhook size={18} strokeWidth={1.8} />
-              </Link>
-            )}
-
-            {/* iOS Safari hint: push requires PWA (Home Screen) mode */}
-            {!isDemo && user && iosNeedsPWA && (
-              <button
-                title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
                 style={{
                   flexShrink: 0,
                   width: "44px", height: "44px", borderRadius: "9999px",
                   background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                  border: "1.5px dashed var(--lt-border)", cursor: "default",
+                  border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "var(--lt-ink-4)",
+                  color: "var(--lt-ink-3)",
+                  transition: "transform 120ms ease-out",
                 }}
-                onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
-                <BellOff size={18} strokeWidth={1.5} />
+                {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
               </button>
-            )}
 
-            {!isDemo && (
-              <Link href="/archived" style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-ink-3)", textDecoration: "none",
-              }}>
-                <Archive size={18} strokeWidth={1.8} />
-              </Link>
-            )}
-            <button
-              onClick={() => setModalOpen(true)}
-              style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-fab-bg)", border: "none",
-                cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-fab-color)",
-                boxShadow: "var(--lt-shadow-fab)",
-                transition: "transform 120ms ease-out, filter 120ms ease-out",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              aria-label="新增物品"
-            >
-              <Plus size={20} strokeWidth={2.5} />
-            </button>
+              {/* Add item (primary action, always visible) */}
+              <button
+                onClick={() => setModalOpen(true)}
+                style={{
+                  flexShrink: 0,
+                  width: "44px", height: "44px", borderRadius: "9999px",
+                  background: "var(--lt-fab-bg)", border: "none",
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--lt-fab-color)",
+                  boxShadow: "var(--lt-shadow-fab)",
+                  transition: "transform 120ms ease-out, filter 120ms ease-out",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                aria-label="新增物品"
+              >
+                <Plus size={20} strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
+
+          {!isDemo && (
+            <div className="lt-home-header-row lt-home-header-row--secondary">
+              {user ? (
+                <div className="lt-user-badge">
+                  <span className="lt-user-badge-name">{user.name}</span>
+                  {isAdmin && (
+                    <Link href="/admin/users" title="用户管理"
+                      style={{ color: "var(--lt-ink-3)", display: "flex", alignItems: "center" }}>
+                      <Settings size={13} strokeWidth={1.8} />
+                    </Link>
+                  )}
+                  <button
+                    className="lt-signout-btn"
+                    onClick={() => signOut().then(() => (window.location.href = "/auth/login"))}
+                    title="退出登录"
+                  >
+                    <LogOut size={12} strokeWidth={2} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />
+                    退出
+                  </button>
+                </div>
+              ) : <div />}
+
+              <div className="lt-home-header-actions">
+                {/* Push notification toggle (authenticated + supported) */}
+                {user && pushSupported && (
+                  <button
+                    onClick={togglePush}
+                    disabled={pushLoading}
+                    title={pushSubscribed ? "关闭推送通知" : "开启推送通知"}
+                    style={{
+                      flexShrink: 0,
+                      width: "44px", height: "44px", borderRadius: "9999px",
+                      background: pushSubscribed ? "var(--lt-ink-1)" : "var(--lt-surface)",
+                      boxShadow: "var(--lt-card-shadow)",
+                      border: "none", cursor: pushLoading ? "default" : "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: pushSubscribed ? "var(--lt-on-ink)" : "var(--lt-ink-3)",
+                      opacity: pushLoading ? 0.6 : 1,
+                      transition: "transform 120ms ease-out, background 180ms ease-out",
+                    }}
+                    onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.transform = "scale(1.07)"; }}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                  >
+                    {pushSubscribed ? <Bell size={18} strokeWidth={1.8} /> : <BellOff size={18} strokeWidth={1.8} />}
+                  </button>
+                )}
+
+                {/* Desktop: shown directly, plenty of room in the row */}
+                {user && (
+                  <Link href="/webhook" title="Webhook 通知" className="lt-header-inline-only" style={{
+                    flexShrink: 0,
+                    width: "44px", height: "44px", borderRadius: "9999px",
+                    background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "var(--lt-ink-3)", textDecoration: "none",
+                    transition: "transform 120ms ease-out",
+                  }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.07)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+                  >
+                    <Webhook size={18} strokeWidth={1.8} />
+                  </Link>
+                )}
+                <Link href="/archived" title="已归档" className="lt-header-inline-only" style={{
+                  flexShrink: 0,
+                  width: "44px", height: "44px", borderRadius: "9999px",
+                  background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--lt-ink-3)", textDecoration: "none",
+                }}>
+                  <Archive size={18} strokeWidth={1.8} />
+                </Link>
+                {user && iosNeedsPWA && (
+                  <button
+                    title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
+                    className="lt-header-inline-only"
+                    style={{
+                      flexShrink: 0,
+                      width: "44px", height: "44px", borderRadius: "9999px",
+                      background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
+                      border: "1.5px dashed var(--lt-border)", cursor: "default",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "var(--lt-ink-4)",
+                    }}
+                    onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
+                  >
+                    <BellOff size={18} strokeWidth={1.5} />
+                  </button>
+                )}
+
+                {/* Mobile: collapsed into one menu so the row never wraps */}
+                <HeaderMenu>
+                  {user && (
+                    <Link href="/webhook" className="lt-header-menu-item">
+                      <span className="lt-header-menu-item-icon"><Webhook size={15} strokeWidth={1.8} /></span>
+                      Webhook 通知
+                    </Link>
+                  )}
+                  <Link href="/archived" className="lt-header-menu-item">
+                    <span className="lt-header-menu-item-icon"><Archive size={15} strokeWidth={1.8} /></span>
+                    已归档
+                  </Link>
+                  {user && iosNeedsPWA && (
+                    <button
+                      type="button"
+                      className="lt-header-menu-item"
+                      onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
+                    >
+                      <span className="lt-header-menu-item-icon"><BellOff size={15} strokeWidth={1.5} /></span>
+                      添加到主屏幕启用推送
+                    </button>
+                  )}
+                </HeaderMenu>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Tab Bar ── */}

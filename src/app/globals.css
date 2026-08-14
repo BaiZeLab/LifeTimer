@@ -5,68 +5,89 @@
 @custom-variant dark (&:is(html.dark *));
 
 /* ─── Life Timer Design Tokens ─────────────────────────────────── */
+/*
+ * Palette concept: "instrument face" — a warm paper dial you read by day,
+ * an inked ledger rather than a neutral SaaS gray. Hue 46–66 (walnut/amber)
+ * replaces the earlier hue-75/88 neutral cream so ink and surfaces share one
+ * warm family. State colors are deepened toward "sealed" tones (patina
+ * green / brass amber / brick vermilion) so they read as calm instrument
+ * markings, not alert chrome. Dark mode keeps its deliberate cool-slate
+ * contrast (see docs/visual-language.md) — day is warm paper, night is a
+ * cool backlit panel; only the semantic (danger/ok/warn) hues are kept
+ * identical across both so meaning never shifts with theme.
+ */
 :root {
-  /* Warm cream palette */
-  --lt-bg:         oklch(94.5% 0.015 88);
-  --lt-surface:    oklch(99.0% 0.008 88);  /* slightly warmer than pure white */
-  --lt-surface-2:  oklch(96.5% 0.010 88);
-  --lt-surface-hover: oklch(97.5% 0.012 88); /* warm hover tint, à la Notion */
+  /* Warm paper palette */
+  --lt-bg:         oklch(92.8% 0.024 66);
+  --lt-surface:    oklch(98.6% 0.012 66);  /* slightly warmer than pure white */
+  --lt-surface-2:  oklch(95.6% 0.018 66);
+  --lt-surface-hover: oklch(96.8% 0.020 66); /* warm hover tint, à la Notion */
 
-  /* Text — warm neutral (hue 75) reduces blue-gray coldness against cream bg */
-  --lt-ink-1:      oklch(17% 0.032 75);
-  --lt-ink-2:      oklch(33% 0.018 75);
-  --lt-ink-3:      oklch(53% 0.013 80);
-  --lt-ink-4:      oklch(52% 0.010 80);   /* ~4.8:1 on surface, WCAG AA */
+  /* Text — walnut ink (hue 46) reads warmer/richer than a neutral gray */
+  --lt-ink-1:      oklch(19% 0.040 46);
+  --lt-ink-2:      oklch(35% 0.032 50);
+  --lt-ink-3:      oklch(53% 0.024 56);
+  --lt-ink-4:      oklch(52% 0.020 58);   /* ~4.8:1 on surface, WCAG AA */
 
-  /* Status colors */
-  --lt-ok:         oklch(78% 0.165 135);
-  --lt-warn:       oklch(67% 0.185 65);
-  --lt-danger:     oklch(59% 0.220 27);
-  --lt-expired-color: oklch(54% 0.014 80);   /* warm muted, distinct from danger */
+  /* Status colors — muted "sealed" tones, shared by both themes so meaning
+     never changes with color scheme (see docs/visual-language.md) */
+  --lt-ok:         oklch(60% 0.135 147);
+  --lt-warn:       oklch(63% 0.175 58);
+  --lt-danger:     oklch(55% 0.196 23);
+  --lt-expired-color: oklch(52% 0.022 58);   /* warm muted, distinct from danger */
 
-  /* Bar track — warm cream neutral */
-  --lt-track:      oklch(91% 0.010 88);
+  /* Deeper variants for thin strokes on light chart backgrounds */
+  --lt-ok-deep:      oklch(45% 0.120 150);
+  --lt-warn-deep:    oklch(47% 0.155 60);
+  --lt-danger-deep:  oklch(47% 0.180 23);
+  --lt-expired-deep: oklch(42% 0.018 60);
 
-  /* Tags — warm amber tint for clear contrast against cream bg */
-  --lt-tag-bg:     oklch(91.5% 0.016 80);
-  --lt-tag-text:   oklch(40% 0.030 70);
+  /* Bar track — warm paper neutral */
+  --lt-track:      oklch(88% 0.022 66);
+
+  /* Tags — warm amber tint for clear contrast against paper bg */
+  --lt-tag-bg:     oklch(89.5% 0.034 52);
+  --lt-tag-text:   oklch(37% 0.052 42);
 
   /* Borders — warm, not cool-green */
-  --lt-border-muted: oklch(91% 0.010 88);
-  --lt-border:       oklch(87% 0.012 88);
+  --lt-border-muted: oklch(88% 0.020 66);
+  --lt-border:       oklch(83.5% 0.024 66);
 
   /* Accent (for focus rings) */
   --lt-accent:     var(--lt-ink-1);
 
-  /* Shadows — warm-tinted, matching warm ink-1 hue */
-  --lt-card-shadow: 0 2px 12px oklch(17% 0.032 75 / 0.07),
-                    0 1px 3px  oklch(17% 0.032 75 / 0.05);
+  /* Shadows — warm-tinted, matching walnut ink-1 hue */
+  --lt-card-shadow: 0 2px 12px oklch(16% 0.040 46 / 0.08),
+                    0 1px 3px  oklch(16% 0.040 46 / 0.05);
 
   /* Text on var(--lt-ink-1) background */
-  --lt-on-ink:     oklch(97% 0.005 88);
+  --lt-on-ink:     oklch(97% 0.010 66);
 
   /* FAB — warm dark, matches ink-1 */
-  --lt-fab-bg:    oklch(18% 0.032 75);
-  --lt-fab-color: oklch(97% 0.005 88);
+  --lt-fab-bg:    oklch(19% 0.040 46);
+  --lt-fab-color: oklch(97% 0.010 66);
 
   /* Tab bar */
-  --lt-tabs-bg:           oklch(91% 0.012 88);
+  --lt-tabs-bg:           oklch(88.5% 0.022 66);
   --lt-tab-active-bg:     var(--lt-ink-1);
   --lt-tab-active-color:  var(--lt-on-ink);
-  --lt-tab-active-shadow: 0 2px 8px oklch(17% 0.032 75 / 0.20);
-  --lt-tab-badge-active:          oklch(100% 0.003 88 / 0.22);
-  --lt-tab-badge-active-urgent:   oklch(75% 0.180 27 / 0.45);
-  --lt-tab-badge-inactive-urgent: oklch(97% 0.020 25);
+  --lt-tab-active-shadow: 0 2px 8px oklch(16% 0.040 46 / 0.20);
+  --lt-tab-badge-active:          oklch(100% 0.006 66 / 0.22);
+  --lt-tab-badge-active-urgent:   oklch(72% 0.175 23 / 0.45);
+  --lt-tab-badge-inactive-urgent: oklch(95% 0.028 22);
 
   /* Shadows (theme-aware) */
-  --lt-card-shadow-hover: 0 6px 24px oklch(17% 0.032 75 / 0.10),
-                          0 2px 6px  oklch(17% 0.032 75 / 0.06);
-  --lt-shadow-fab:        0 4px 20px oklch(10% 0.025 75 / 0.32);
-  --lt-shadow-fab-hover:  0 6px 28px oklch(10% 0.025 75 / 0.44);
+  --lt-card-shadow-hover: 0 6px 24px oklch(16% 0.040 46 / 0.11),
+                          0 2px 6px  oklch(16% 0.040 46 / 0.06);
+  --lt-shadow-fab:        0 4px 20px oklch(10% 0.032 46 / 0.32);
+  --lt-shadow-fab-hover:  0 6px 28px oklch(10% 0.032 46 / 0.44);
 
-  /* Skeleton shimmer — warm cream tones */
-  --lt-skel-base:  oklch(93.5% 0.010 88);
-  --lt-skel-shine: oklch(97.8% 0.006 88);
+  /* Skeleton shimmer — warm paper tones */
+  --lt-skel-base:  oklch(91.5% 0.020 66);
+  --lt-skel-shine: oklch(97% 0.012 66);
+
+  /* Meter ticks — the quiet drain instrument's quarter-marks */
+  --lt-tick: oklch(78% 0.020 66);
 
   /* shadcn overrides */
   --background: var(--lt-bg);
@@ -76,7 +97,7 @@
   --popover: var(--lt-surface);
   --popover-foreground: var(--lt-ink-1);
   --primary: var(--lt-ink-1);
-  --primary-foreground: oklch(99% 0.002 88);
+  --primary-foreground: oklch(99% 0.008 66);
   --secondary: var(--lt-surface-2);
   --secondary-foreground: var(--lt-ink-2);
   --muted: var(--lt-surface-2);
@@ -85,7 +106,7 @@
   --accent-foreground: var(--lt-ink-2);
   --destructive: var(--lt-danger);
   --border: var(--lt-border);
-  --input: oklch(87% 0.012 88);
+  --input: oklch(83.5% 0.024 66);
   --ring: var(--lt-ink-1);
   --radius: 0.75rem;
 }
@@ -118,14 +139,15 @@
     --lt-tab-active-color:  oklch(95% 0.005 88);
     --lt-tab-active-shadow: 0 2px 8px oklch(5% 0.02 263 / 0.45);
     --lt-tab-badge-active:          oklch(100% 0.005 88 / 0.18);
-    --lt-tab-badge-active-urgent:   oklch(58% 0.180 27 / 0.65);
-    --lt-tab-badge-inactive-urgent: oklch(45% 0.120 27 / 0.40);
+    --lt-tab-badge-active-urgent:   oklch(58% 0.180 23 / 0.65);
+    --lt-tab-badge-inactive-urgent: oklch(45% 0.120 23 / 0.40);
     --lt-card-shadow-hover: 0 6px 24px oklch(5% 0.02 263 / 0.35),
                             0 2px 6px  oklch(5% 0.02 263 / 0.22);
     --lt-shadow-fab:        0 4px 20px oklch(5% 0.02 263 / 0.55);
     --lt-shadow-fab-hover:  0 6px 28px oklch(5% 0.02 263 / 0.65);
     --lt-skel-base:  oklch(23%   0.012 263);
     --lt-skel-shine: oklch(29%   0.010 263);
+    --lt-tick: oklch(45% 0.012 263);
     --background: var(--lt-bg);
     --foreground: var(--lt-ink-1);
     --card: var(--lt-surface);
@@ -136,7 +158,7 @@
     --muted: var(--lt-surface-2);
     --border: var(--lt-border);
     --input: oklch(30% 0.012 263);
-    --lt-danger-hover-bg: oklch(22% 0.025 25);
+    --lt-danger-hover-bg: oklch(22% 0.025 23);
   }
 }
 
@@ -168,14 +190,15 @@ html.dark {
   --lt-tab-active-color:  oklch(95% 0.005 88);
   --lt-tab-active-shadow: 0 2px 8px oklch(5% 0.02 263 / 0.45);
   --lt-tab-badge-active:          oklch(100% 0.005 88 / 0.18);
-  --lt-tab-badge-active-urgent:   oklch(58% 0.180 27 / 0.65);
-  --lt-tab-badge-inactive-urgent: oklch(45% 0.120 27 / 0.40);
+  --lt-tab-badge-active-urgent:   oklch(58% 0.180 23 / 0.65);
+  --lt-tab-badge-inactive-urgent: oklch(45% 0.120 23 / 0.40);
   --lt-card-shadow-hover: 0 6px 24px oklch(5% 0.02 263 / 0.35),
                           0 2px 6px  oklch(5% 0.02 263 / 0.22);
   --lt-shadow-fab:        0 4px 20px oklch(5% 0.02 263 / 0.55);
   --lt-shadow-fab-hover:  0 6px 28px oklch(5% 0.02 263 / 0.65);
   --lt-skel-base:  oklch(23%   0.012 263);
   --lt-skel-shine: oklch(29%   0.010 263);
+  --lt-tick: oklch(45% 0.012 263);
   --background: var(--lt-bg);
   --foreground: var(--lt-ink-1);
   --card: var(--lt-surface);
@@ -186,7 +209,7 @@ html.dark {
   --muted: var(--lt-surface-2);
   --border: var(--lt-border);
   --input: oklch(30% 0.012 263);
-  --lt-danger-hover-bg: oklch(22% 0.025 25);
+  --lt-danger-hover-bg: oklch(22% 0.025 23);
 }
 
 @theme inline {
@@ -233,6 +256,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--lt-bg);
+  /* Every days-left / percentage / meter reading in the app is a number the
+     user compares at a glance — tabular figures keep those columns aligned
+     instead of jittering as digits change width. */
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Tab Bar ───────────────────────────────────────────────────── */
@@ -290,7 +317,7 @@ body {
 /* ─── Item Card ────────────────────────────────────────────────── */
 .lt-card {
   background: var(--lt-surface);
-  border-radius: 22px;
+  border-radius: 20px;
   padding: 20px;
   box-shadow: var(--lt-card-shadow);
   display: flex;
@@ -309,27 +336,27 @@ body {
 
 /* Status-aware card accent ring (inset, no layout shift) */
 .lt-card[data-status="warning"] {
-  box-shadow: inset 0 0 0 1.5px oklch(78% 0.100 65 / 0.60),
+  box-shadow: inset 0 0 0 1.5px oklch(from var(--lt-warn) l c h / 0.55),
               var(--lt-card-shadow);
 }
 .lt-card[data-status="warning"]:hover {
-  box-shadow: inset 0 0 0 1.5px oklch(78% 0.100 65 / 0.60),
+  box-shadow: inset 0 0 0 1.5px oklch(from var(--lt-warn) l c h / 0.55),
               var(--lt-card-shadow-hover);
 }
 .lt-card[data-status="danger"] {
-  box-shadow: inset 0 0 0 1.5px oklch(72% 0.130 27 / 0.55),
+  box-shadow: inset 0 0 0 1.5px oklch(from var(--lt-danger) l c h / 0.55),
               var(--lt-card-shadow);
 }
 .lt-card[data-status="danger"]:hover {
-  box-shadow: inset 0 0 0 1.5px oklch(72% 0.130 27 / 0.55),
+  box-shadow: inset 0 0 0 1.5px oklch(from var(--lt-danger) l c h / 0.55),
               var(--lt-card-shadow-hover);
 }
 .lt-card[data-status="expired"] {
-  box-shadow: inset 0 0 0 1.5px oklch(65% 0.016 80 / 0.45),
+  box-shadow: inset 0 0 0 1.5px oklch(from var(--lt-expired-color) l c h / 0.45),
               var(--lt-card-shadow);
 }
 .lt-card[data-status="expired"]:hover {
-  box-shadow: inset 0 0 0 1.5px oklch(65% 0.016 80 / 0.45),
+  box-shadow: inset 0 0 0 1.5px oklch(from var(--lt-expired-color) l c h / 0.45),
               var(--lt-card-shadow-hover);
 }
 
@@ -337,12 +364,25 @@ body {
 .lt-status-summary { margin-bottom: 14px; }
 
 .lt-status-bar {
+  position: relative;
   height: 7px;
   border-radius: 9999px;
   overflow: hidden;
   display: flex;
   background: var(--lt-track);
 }
+
+/* Quarter-marks echo the days-ring gauge below each card: a fixed reading
+   grid so "about a third are urgent" can be judged without doing math. */
+.lt-status-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: oklch(20% 0.020 46 / 0.16);
+  pointer-events: none;
+}
+html.dark .lt-status-tick { background: oklch(95% 0.010 263 / 0.20); }
 
 /* ─── Skeleton shimmer ─────────────────────────────────────────── */
 .lt-skeleton {
@@ -398,34 +438,94 @@ body {
   .lt-fab { display: flex; }
 }
 
-/* ─── Home page header (responsive) ──────────────────────────────
- * Title and action-icon row compete for horizontal space on narrow
- * screens. Stacking them on mobile (instead of squeezing side by side)
- * keeps the title from wrapping and gives the icon row its full width
- * so all icons stay in one line at full 44px touch size. */
+/* ─── Home page header ────────────────────────────────────────────
+ * Two fixed rows at every viewport width instead of one row that
+ * squeezes the title against the icon cluster (and wraps on mobile):
+ * row 1 pairs the title with the primary actions (theme, add), row 2
+ * pairs the account badge with secondary actions. Desktop has room to
+ * show webhook/archived/iOS-hint directly; mobile collapses them into
+ * a single "more" menu so the row never grows past two 44px buttons
+ * (see .lt-header-inline-only / .lt-header-menu below). */
 .lt-home-header {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lt-home-header-row {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
   gap: 12px;
+}
+.lt-home-header-row--secondary {
+  min-height: 30px;
 }
 .lt-home-header-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
+/* ─── Header "more" menu (collapses secondary header actions) ─────
+ * Desktop has plenty of room, so webhook/archived/iOS-hint render as
+ * direct icon buttons there (.lt-header-inline-only) and the "more"
+ * trigger stays hidden; mobile swaps the two so the row never grows
+ * past two 44px buttons. */
+.lt-header-menu { position: relative; flex-shrink: 0; display: none; }
+
 @media (max-width: 640px) {
-  .lt-home-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  .lt-header-menu { display: block; }
+  .lt-header-inline-only { display: none !important; }
+}
+
+.lt-header-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--lt-surface);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px oklch(16% 0.040 46 / 0.18),
+              0 2px 8px  oklch(16% 0.040 46 / 0.10);
+  border: 1px solid var(--lt-border-muted);
+  padding: 6px;
+  min-width: 190px;
+  z-index: 30;
+}
+
+.lt-header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lt-ink-2);
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 100ms ease-out;
+}
+
+.lt-header-menu-item:hover { background: var(--lt-surface-2); }
+
+.lt-header-menu-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--lt-ink-3);
 }
 
 /* ─── Danger hover background (adapts to theme) ────────────────── */
-:root { --lt-danger-hover-bg: oklch(97% 0.018 30); }
+:root { --lt-danger-hover-bg: oklch(95.5% 0.028 24); }
 
 /* ─── Overflow dropdown menu ───────────────────────────────────── */
 .lt-overflow-menu { position: relative; }
@@ -436,8 +536,8 @@ body {
   bottom: calc(100% + 6px);
   background: var(--lt-surface);
   border-radius: 12px;
-  box-shadow: 0 4px 20px oklch(17% 0.032 75 / 0.14),
-              0 1px 4px  oklch(17% 0.032 75 / 0.08);
+  box-shadow: 0 4px 20px oklch(16% 0.040 46 / 0.16),
+              0 1px 4px  oklch(16% 0.040 46 / 0.09);
   padding: 5px;
   min-width: 108px;
   z-index: 20;
@@ -469,7 +569,7 @@ body {
 
 .lt-overflow-item.danger:hover { background: var(--lt-danger-hover-bg); }
 
-html.dark .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
+html.dark .lt-overflow-item.danger:hover { background: oklch(22% 0.025 23); }
 
 /* ─── Tag chip input ───────────────────────────────────────────── */
 .lt-tag-input-wrap {
@@ -488,7 +588,7 @@ html.dark .lt-overflow-item.danger:hover { background: oklch(22% 0.025 25); }
 
 .lt-tag-input-wrap:focus-within {
   border-color: var(--lt-ink-1);
-  box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
+  box-shadow: 0 0 0 3px oklch(16% 0.040 46 / 0.10);
 }
 
 html.dark .lt-tag-input-wrap:focus-within {
@@ -529,7 +629,7 @@ html.dark .lt-tag-input-wrap:focus-within {
 
 .lt-tag-chip-remove:hover {
   opacity: 1;
-  background: oklch(83% 0.018 80 / 0.5);
+  background: oklch(81% 0.032 55 / 0.5);
 }
 
 /* ─── Stat Box (consumption) ───────────────────────────────────── */
@@ -595,7 +695,7 @@ html.dark .lt-tag-input-wrap:focus-within {
 
 .lt-input:focus {
   border-color: var(--lt-ink-1);
-  box-shadow: 0 0 0 3px oklch(17% 0.032 75 / 0.10);
+  box-shadow: 0 0 0 3px oklch(16% 0.040 46 / 0.10);
 }
 
 html.dark .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
@@ -624,7 +724,7 @@ html.dark .lt-input:focus { box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12); }
 .lt-seg {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: oklch(92% 0.010 88);
+  background: oklch(89% 0.020 66);
   border-radius: 12px;
   padding: 3px;
 }
@@ -646,7 +746,7 @@ html.dark .lt-seg { background: oklch(30% 0.013 80); }
 .lt-seg-btn.active {
   background: var(--lt-surface);
   color: var(--lt-ink-1);
-  box-shadow: 0 1px 4px oklch(17% 0.032 75 / 0.08);
+  box-shadow: 0 1px 4px oklch(16% 0.040 46 / 0.08);
 }
 
 /* ─── Dialog buttons ────────────────────────────────────────────── */
@@ -684,7 +784,7 @@ html.dark .lt-seg { background: oklch(30% 0.013 80); }
   padding: 0 16px;
 }
 
-.lt-btn-ghost:not(:disabled):hover  { background: oklch(89% 0.012 88); color: var(--lt-ink-1); }
+.lt-btn-ghost:not(:disabled):hover  { background: oklch(86% 0.022 66); color: var(--lt-ink-1); }
 .lt-btn-ghost:not(:disabled):active { filter: brightness(0.94); }
 
 html.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); }

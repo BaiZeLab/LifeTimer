@@ -33,10 +33,16 @@ export interface PushPayload {
   tag?:  string;
 }
 
+// A single unreachable push service (e.g. a long-dead endpoint) must not be
+// able to hang the whole request — cap each send so callers always get a
+// timely response regardless of how many subscriptions a user has.
+const SEND_TIMEOUT_MS = 10_000;
+
 /**
  * Send a push notification to a single subscription.
  * Returns `true` on success, `false` if the subscription is stale (410/404).
- * Re-throws other errors so the caller can decide handling.
+ * Re-throws other errors — including a socket timeout — so the caller skips
+ * the device without deleting its (possibly still-valid) subscription.
  */
 export async function sendPush(
   sub: PushSubscriptionKeys,
@@ -47,7 +53,7 @@ export async function sendPush(
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify(payload),
-      { TTL: 60 * 60 * 24 } // 24 h TTL
+      { TTL: 60 * 60 * 24, timeout: SEND_TIMEOUT_MS } // 24 h TTL
     );
     return true;
   } catch (err: unknown) {

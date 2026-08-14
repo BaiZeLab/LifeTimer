@@ -10,7 +10,7 @@
 
 // Bump this version whenever sw.js logic changes to force all clients to
 // activate the new worker and clear the old cache.
-const CACHE_VERSION = "lt-v3";
+const CACHE_VERSION = "lt-v4";
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 
 const PRECACHE_URLS = [
@@ -142,8 +142,14 @@ self.addEventListener("notificationclick", (event) => {
       .then((clients) => {
         for (const client of clients) {
           if (client.url.includes(self.location.origin) && "focus" in client) {
-            client.navigate(targetUrl);
-            return client.focus();
+            // navigate() must be awaited before returning — otherwise the
+            // event's waitUntil promise can resolve (via focus()) before the
+            // navigation actually completes, and the SW may be torn down
+            // mid-navigation, leaving the window focused on whatever page it
+            // already had open (typically "/") instead of the target URL.
+            return client.navigate(targetUrl)
+              .then((navigated) => (navigated || client).focus())
+              .catch(() => client.focus());
           }
         }
         return self.clients.openWindow(targetUrl);

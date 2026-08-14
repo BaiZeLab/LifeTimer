@@ -118,22 +118,44 @@ function Row({
     ok === null ? AlertCircle : ok ? CheckCircle : warn ? AlertCircle : XCircle;
   const color =
     ok === null
-      ? "text-gray-400"
+      ? "var(--lt-ink-4)"
       : ok
-      ? "text-green-500"
+      ? "var(--lt-ok-deep)"
       : warn
-      ? "text-amber-500"
-      : "text-red-500";
+      ? "var(--lt-warn-deep)"
+      : "var(--lt-danger)";
 
   return (
-    <div className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
-      <Icon size={18} className={`${color} mt-0.5 shrink-0`} />
-      <div className="min-w-0 flex-1">
-        <span className="font-medium text-gray-800 text-sm">{label}</span>
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: "10px",
+      padding: "9px 0", borderBottom: "1px solid var(--lt-border-muted)",
+    }}>
+      <Icon size={17} strokeWidth={1.8} style={{ color, marginTop: "1px", flexShrink: 0 }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <span style={{ fontWeight: 600, color: "var(--lt-ink-2)", fontSize: "13.5px" }}>{label}</span>
         {value !== undefined && (
-          <p className="text-xs text-gray-500 mt-0.5 break-all">{value}</p>
+          <p style={{ fontSize: "11.5px", color: "var(--lt-ink-4)", marginTop: "2px", wordBreak: "break-all", lineHeight: 1.5 }}>
+            {value}
+          </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function ResultSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: "var(--lt-surface)", borderRadius: "16px",
+      boxShadow: "var(--lt-card-shadow)", padding: "16px", marginBottom: "12px",
+    }}>
+      <p style={{
+        fontSize: "11px", fontWeight: 700, color: "var(--lt-ink-4)",
+        letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px",
+      }}>
+        {title}
+      </p>
+      {children}
     </div>
   );
 }
@@ -219,40 +241,65 @@ export default function PwaCheckPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-start p-4 py-8">
-      <div className="w-full max-w-md">
+    <div style={{
+      minHeight: "100dvh", background: "var(--lt-bg)",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      padding: "32px 16px 48px",
+    }}>
+      <div style={{ width: "100%", maxWidth: "420px" }}>
         {/* Header */}
-        <div className="mb-6 text-center">
-          <h1 className="text-xl font-bold text-gray-900">PWA 诊断</h1>
-          <p className="text-sm text-gray-500 mt-1">Life Timer · 设备兼容性检测</p>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <h1 style={{ fontSize: "20px", fontWeight: 700, color: "var(--lt-ink-1)", letterSpacing: "-0.02em", margin: 0 }}>
+            PWA 诊断
+          </h1>
+          <p style={{ fontSize: "13px", color: "var(--lt-ink-4)", marginTop: "4px" }}>
+            Life Timer · 设备兼容性检测
+          </p>
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 flex items-center justify-center gap-3 text-gray-500">
-            <RefreshCw size={20} className="animate-spin" />
-            <span className="text-sm">检测中…</span>
+          <div style={{
+            background: "var(--lt-surface)", borderRadius: "16px", boxShadow: "var(--lt-card-shadow)",
+            padding: "32px", display: "flex", alignItems: "center", justifyContent: "center",
+            gap: "10px", color: "var(--lt-ink-4)",
+          }}>
+            <RefreshCw size={18} className="lt-spin" />
+            <span style={{ fontSize: "13px" }}>检测中…</span>
           </div>
         ) : result ? (
           <>
             {/* Issues Banner */}
             {issues.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-                <p className="text-sm font-semibold text-red-700 mb-2">发现 {issues.length} 个问题</p>
+              <div style={{
+                background: "var(--lt-danger-hover-bg)",
+                border: "1px solid oklch(from var(--lt-danger) l c h / 0.25)",
+                borderRadius: "14px", padding: "14px 16px", marginBottom: "14px",
+              }}>
+                <p style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--lt-danger)", marginBottom: "6px" }}>
+                  发现 {issues.length} 个问题
+                </p>
                 {issues.map((issue, i) => (
-                  <p key={i} className="text-xs text-red-600 mb-1 leading-relaxed">• {issue}</p>
+                  <p key={i} style={{ fontSize: "12px", color: "var(--lt-danger-deep)", marginBottom: "3px", lineHeight: 1.6 }}>
+                    · {issue}
+                  </p>
                 ))}
               </div>
             )}
 
             {issues.length === 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-                <p className="text-sm font-semibold text-green-700">全部检测通过 ✓</p>
+              <div style={{
+                background: "oklch(from var(--lt-ok) l c h / 0.12)",
+                border: "1px solid oklch(from var(--lt-ok) l c h / 0.30)",
+                borderRadius: "14px", padding: "14px 16px", marginBottom: "14px",
+              }}>
+                <p style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--lt-ok-deep)" }}>
+                  全部检测通过 ✓
+                </p>
               </div>
             )}
 
             {/* Results */}
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">设备</p>
+            <ResultSection title="设备">
               <Row label="HTTPS" ok={result.isHttps} />
               <Row
                 label={result.isIos ? `iOS ${result.iosVersion}` : result.isAndroid ? "Android" : "Desktop"}
@@ -260,10 +307,9 @@ export default function PwaCheckPage() {
                 value={result.userAgent.slice(0, 80) + (result.userAgent.length > 80 ? "…" : "")}
               />
               <Row label="PWA 独立模式（Standalone）" ok={result.isStandalone} />
-            </div>
+            </ResultSection>
 
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">API 支持</p>
+            <ResultSection title="API 支持">
               <Row label="Service Worker 支持" ok={result.swSupported} />
               <Row label="Service Worker 已注册" ok={result.swRegistered} />
               <Row label="Notification API" ok={result.notifSupported} />
@@ -273,10 +319,9 @@ export default function PwaCheckPage() {
                 warn={result.notifPerm === "default"}
               />
               <Row label="PushManager" ok={result.pushSupported} />
-            </div>
+            </ResultSection>
 
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">资源加载</p>
+            <ResultSection title="资源加载">
               <Row label="manifest.json" ok={result.manifestOk} value={result.manifestMime} />
               <Row label="icon-192.png" ok={result.icon192Ok} />
               <Row
@@ -288,49 +333,44 @@ export default function PwaCheckPage() {
                     : result.appleIconMime
                 }
               />
-            </div>
+            </ResultSection>
 
             {/* Actions */}
-            <div className="flex gap-3">
+            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
               <button
                 onClick={send}
                 disabled={sending || sent}
-                className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-60"
+                className="lt-btn lt-btn-primary"
+                style={{ flex: 1 }}
               >
                 {sent ? (
                   <>
-                    <Check size={16} />
+                    <Check size={15} strokeWidth={2.2} />
                     {diagCode ? `已发送 · ${diagCode}` : "已发送给管理员"}
                   </>
                 ) : sending ? (
                   <>
-                    <RefreshCw size={16} className="animate-spin" />
+                    <RefreshCw size={15} className="lt-spin" />
                     发送中…
                   </>
                 ) : (
                   <>
-                    <Send size={16} />
+                    <Send size={15} strokeWidth={1.8} />
                     发送报告给管理员
                   </>
                 )}
               </button>
 
-              <button
-                onClick={copy}
-                className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 rounded-xl px-4 py-3 text-sm"
-              >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
+              <button onClick={copy} className="lt-btn lt-btn-ghost" style={{ padding: "0 16px" }}>
+                {copied ? <Check size={15} strokeWidth={2.2} /> : <Copy size={15} strokeWidth={1.8} />}
               </button>
 
-              <button
-                onClick={run}
-                className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 rounded-xl px-4 py-3 text-sm"
-              >
-                <RefreshCw size={16} />
+              <button onClick={run} className="lt-btn lt-btn-ghost" style={{ padding: "0 16px" }}>
+                <RefreshCw size={15} strokeWidth={1.8} />
               </button>
             </div>
 
-            <p className="text-xs text-gray-400 text-center mt-4">
+            <p style={{ fontSize: "11.5px", color: "var(--lt-ink-4)", textAlign: "center", marginTop: "16px" }}>
               检测时间: {new Date(result.timestamp).toLocaleString("zh-CN")}
             </p>
           </>

@@ -10,7 +10,7 @@ const RATE_LIMIT_PER_MINUTE = 20;
 const RATE_LIMIT_PER_HOUR = 120;
 
 // Keep the inbox bounded per user; oldest entries beyond this are pruned.
-const MAX_LOG_ENTRIES = 200;
+const MAX_LOG_ENTRIES = 10;
 
 export const TITLE_MAX_LEN = 100;
 export const BODY_MAX_LEN = 2000;
@@ -131,7 +131,7 @@ export async function updateWebhookLogResult(
   `;
 }
 
-export async function listWebhookLog(userId: string, limit = 50): Promise<WebhookLogRow[]> {
+export async function listWebhookLog(userId: string, limit = MAX_LOG_ENTRIES): Promise<WebhookLogRow[]> {
   return await sql`
     SELECT id, title, body, status, delivered, created_at
     FROM webhook_log

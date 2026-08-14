@@ -93,17 +93,23 @@ async function handle(req: NextRequest, token: string): Promise<NextResponse> {
       tag: `lt-webhook-${logId}`,
     };
 
-    for (const sub of subs) {
-      try {
-        const ok = await sendPush(sub, payload);
-        if (ok) {
+    // Send to every device in parallel — a single slow/unreachable endpoint
+    // (bounded by sendPush's own timeout) must not delay delivery to the
+    // rest, nor stall the response back to the webhook caller.
+    const results = await Promise.allSettled(subs.map((sub) => sendPush(sub, payload)));
+    const staleEndpoints: string[] = [];
+    results.forEach((result, i) => {
+      if (result.status === "fulfilled") {
+        if (result.value) {
           delivered++;
         } else {
-          await sql`DELETE FROM push_subscriptions WHERE endpoint = ${sub.endpoint}`;
+          staleEndpoints.push(subs[i].endpoint);
         }
-      } catch {
-        // Non-stale send error — skip this device, keep going.
       }
+      // rejected (non-stale error, e.g. timeout) — skip this device, keep going.
+    });
+    if (staleEndpoints.length) {
+      await sql`DELETE FROM push_subscriptions WHERE endpoint = ANY(${staleEndpoints})`;
     }
   }
 
