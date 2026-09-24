@@ -439,23 +439,39 @@ html.dark .lt-status-tick { background: oklch(95% 0.010 263 / 0.20); }
 }
 
 /* ─── Home page header ────────────────────────────────────────────
- * Single row: title (+ account badge below it) on the left, action
- * icons on the right. Notification + webhook share one 44px button,
- * so there are only ever 4 icons — this fits comfortably even on
- * narrow phones without wrapping. */
+ * One line: wordmark left, account menu + add button right. Theme,
+ * push, recipes and archive used to be four more 44px circles on a
+ * second row, which cost 58px of the first screen for operations used
+ * at most once a day; they now live inside the account menu.
+ * The user name is the only elastic part of the row, so a long name
+ * ellipsises instead of pushing the header into a horizontal
+ * overflow — hence no flex-shrink: 0 on the actions. */
 .lt-home-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
+
+.lt-home-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--lt-ink-1);
+  white-space: nowrap;
+}
+
 .lt-home-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .lt-home-title { font-size: 28px; }
 }
 
 /* ─── Danger hover background (adapts to theme) ────────────────── */
@@ -824,26 +840,101 @@ html.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); 
 }
 .lt-auth-link { color: var(--lt-ink-2); text-decoration: underline; }
 
-/* ─── User badge (top-right of main header) ─────────────────────── */
-.lt-user-badge {
+/* ─── Account menu (home header) ──────────────────────────────────
+ * Same popover language as the card overflow menu, but with 44px rows:
+ * this menu is the only route to the side pages, so it has to be
+ * comfortable on touch rather than a compact desktop affordance. */
+.lt-account-trigger {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.8125rem;
-  color: var(--lt-ink-3);
-}
-.lt-user-badge-name { font-weight: 500; color: var(--lt-ink-2); }
-.lt-signout-btn {
-  padding: 4px 10px;
-  border: 1px solid var(--lt-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--lt-ink-3);
-  font-size: 0.75rem;
+  gap: 6px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--lt-surface);
+  box-shadow: var(--lt-card-shadow);
+  color: var(--lt-ink-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 120ms ease-out;
 }
-.lt-signout-btn:hover { background: var(--lt-surface-2); color: var(--lt-ink-2); }
+.lt-account-trigger:hover { background: var(--lt-surface-hover); }
+.lt-account-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lt-account-caret {
+  flex-shrink: 0;
+  color: var(--lt-ink-3);
+  transition: transform 150ms ease-out;
+}
+.lt-account-trigger[data-popup-open] .lt-account-caret { transform: rotate(180deg); }
+
+.lt-menu-positioner { z-index: 9999; }
+
+.lt-menu {
+  min-width: 196px;
+  padding: 5px;
+  border: 1px solid var(--lt-border-muted);
+  border-radius: 12px;
+  background: var(--lt-surface);
+  box-shadow: 0 4px 20px oklch(16% 0.040 46 / 0.18),
+              0 1px 4px  oklch(16% 0.040 46 / 0.10);
+  outline: none;
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+.lt-menu[data-starting-style],
+.lt-menu[data-ending-style] { opacity: 0; transform: scale(0.97); }
+
+.lt-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--lt-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  transition: background 100ms ease-out;
+}
+.lt-menu-item svg { flex-shrink: 0; }
+.lt-menu-item[data-highlighted] { background: var(--lt-surface-2); color: var(--lt-ink-1); }
+.lt-menu-item[data-disabled] { opacity: 0.55; cursor: default; }
+.lt-menu-item--danger { color: var(--lt-danger); }
+.lt-menu-item--danger[data-highlighted] {
+  background: var(--lt-danger-hover-bg);
+  color: var(--lt-danger);
+}
+
+.lt-menu-sep {
+  height: 1px;
+  margin: 5px 8px;
+  border: none;
+  background: var(--lt-border-muted);
+}
+
+.lt-menu-note {
+  display: flex;
+  gap: 10px;
+  max-width: 230px;
+  margin: 0;
+  padding: 8px 12px 10px;
+  color: var(--lt-ink-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.lt-menu-note svg { flex-shrink: 0; margin-top: 2px; }
 
 /* ─── Admin users page ──────────────────────────────────────────── */
 .lt-admin-layout {
@@ -922,3 +1013,95 @@ html.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); 
     align-items: start;
   }
 }
+
+/* ─── Recipe form rows ─────────────────────────────────────────────
+ * Ingredient name + amount stay on one line down to narrow phones;
+ * steps get a fixed number gutter so the list reads as an ordered
+ * sequence while editing, matching the detail view. */
+.lt-ing-row {
+  display: grid;
+  grid-template-columns: 1fr 92px 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.lt-step-row {
+  display: grid;
+  grid-template-columns: 20px 1fr 44px;
+  gap: 8px;
+  align-items: start;
+}
+
+.lt-step-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lt-ink-4);
+  padding-top: 16px;
+  text-align: center;
+}
+
+.lt-row-remove {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lt-ink-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.lt-step-row .lt-row-remove { margin-top: 5px; }
+
+.lt-row-remove:hover { background: var(--lt-danger-hover-bg); color: var(--lt-danger); }
+
+.lt-row-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lt-ink-3);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.lt-row-add:hover { background: var(--lt-surface-2); color: var(--lt-ink-1); }
+
+@media (max-width: 380px) {
+  .lt-ing-row { grid-template-columns: 1fr 76px 44px; }
+}
+
+/* ─── Card footer action (recipe cards) ────────────────────────── */
+.lt-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--lt-ink-3);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.lt-card-action:hover { background: var(--lt-surface-2); color: var(--lt-ink-1); }
+
+.lt-card-action--danger { color: var(--lt-danger); }
+.lt-card-action--danger:hover { background: var(--lt-danger-hover-bg); color: var(--lt-danger); }

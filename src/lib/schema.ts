@@ -329,4 +329,53 @@ export async function migrate(): Promise<void> {
   `;
 
   await sql`CREATE INDEX IF NOT EXISTS idx_pwa_diag_time ON pwa_diagnostics(submitted_at DESC)`;
+
+  // ── Recipes (menu / ingredient notes) ─────────────────────────────────────
+  //
+  // Deliberately independent from `items`: a recipe has no time dimension and
+  // no ok/warning/danger status, so reusing the deadline/consumption model
+  // would only add empty columns. Ingredients and steps are ordered child rows
+  // that are always rewritten as a whole when a recipe is saved.
+  //
+  // `quantity` is free text ("2 个" / "适量" / "300g") and NOT NULL DEFAULT ''
+  // because household amounts are rarely clean numbers; an empty string means
+  // "not recorded".
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS recipes (
+      id         SERIAL      PRIMARY KEY,
+      user_id    TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      name       TEXT        NOT NULL,
+      category   TEXT,
+      servings   TEXT,
+      notes      TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS recipe_ingredients (
+      id        SERIAL  PRIMARY KEY,
+      recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      name      TEXT    NOT NULL,
+      quantity  TEXT    NOT NULL DEFAULT '',
+      position  INTEGER NOT NULL DEFAULT 0
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS recipe_steps (
+      id        SERIAL  PRIMARY KEY,
+      recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      content   TEXT    NOT NULL,
+      position  INTEGER NOT NULL DEFAULT 0
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_recipes_user        ON recipes(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_recipe_ing_recipe   ON recipe_ingredients(recipe_id, position)`;
+  // Supports "what can I cook with the eggplant in the fridge" — search by ingredient name
+  await sql`CREATE INDEX IF NOT EXISTS idx_recipe_ing_name     ON recipe_ingredients(name)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_recipe_steps_recipe ON recipe_steps(recipe_id, position)`;
 }

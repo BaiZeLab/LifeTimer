@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getItemOwner } from "./items-query";
+import { getRecipeOwner } from "./recipes-query";
 
 export type AuthedSession = {
   user: { id: string; role: string; name: string; email: string };
@@ -23,6 +24,17 @@ export async function requireItemOwnership(
   userId: string
 ): Promise<NextResponse | null> {
   const ownerId = await getItemOwner(itemId);
+  if (!ownerId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (ownerId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return null;
+}
+
+/** Verify the session user owns the recipe. Returns 403 if not. */
+export async function requireRecipeOwnership(
+  recipeId: number,
+  userId: string
+): Promise<NextResponse | null> {
+  const ownerId = await getRecipeOwner(recipeId);
   if (!ownerId) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (ownerId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return null;

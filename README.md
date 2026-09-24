@@ -28,11 +28,13 @@ src/
 │   ├── page.tsx                # 首页（分组列表）
 │   ├── demo/                   # 无需登录的演示模式
 │   ├── archived/               # 归档列表
+│   ├── recipes/                # 菜单（用料记录 + 做法，含详情页 [id]）
 │   ├── pwa-check/              # PWA 诊断页（公开，无需登录）
 │   ├── auth/                   # 登录 / 注册 / 初始化
 │   ├── admin/users/            # 管理员面板（用户、邀请码、推送、诊断）
 │   └── api/
 │       ├── items/              # 条目 CRUD + 续期 + 示数日志
+│       ├── recipes/            # 菜单 CRUD（用料、做法）+ 食材名补全
 │       ├── tags/               # 标签管理
 │       ├── auth/               # 注册（邀请码）/ 初始化
 │       ├── push/subscribe/     # Web Push 订阅管理
@@ -138,7 +140,7 @@ docker run -d \
 
 ### Web Push 通知
 
-- 主页头部只有一个通知图标：未订阅时点击即触发浏览器授权并订阅，订阅信息存入 `push_subscriptions` 表；订阅成功后同一个图标切换为跳转 `/webhook` 页面的入口。取消订阅需在 `/webhook` 页面完成，主页图标不再承担取消订阅的职责。
+- 主页账号菜单里只有一个通知项：未订阅时点击即触发浏览器授权并订阅，订阅信息存入 `push_subscriptions` 表；订阅成功后同一项切换为跳转 `/webhook` 页面的入口。取消订阅需在 `/webhook` 页面完成，主页不承担取消订阅的职责。
 - 每小时 Cron 自动扫描：到期提醒提前 `alert_days` 天推送，每条目 20 小时内去重
 - 管理员可在 `/admin/users` 手动向全部或指定用户发送推送
 
@@ -205,6 +207,11 @@ deadline_renewals (id, item_id, renewed_at, old_expire_date, new_expire_date, no
 consumption_items (item_id, unit, alert_days)
 consumption_logs (id, item_id, recorded_at, value, is_topup, is_anomaly, notes)
 
+-- 菜单（与 items 无关：菜品没有时间维度和状态，不复用条目模型）
+recipes (id, user_id, name, category, servings, notes, created_at, updated_at)
+recipe_ingredients (id, recipe_id, name, quantity, position)  -- quantity 为自由文本，'' 表示未记录
+recipe_steps (id, recipe_id, content, position)
+
 -- Web Push
 push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
 push_log (id, user_id, item_id, sent_at)  -- 去重日志
@@ -252,6 +259,16 @@ Schema 变更通过 `src/lib/schema.ts` 中的 `migrate()` 幂等迁移，服务
 - 支持标记异常值，异常记录不计入速率计算
 - **消耗速率算法**：按充值事件切分分段 → 各段日均速率 → 指数衰减加权平均 → 外推估算余量和耗尽日期
 - 消耗趋势图（折线图 + 预测线）+ 消耗热力图
+
+### 附属模块：菜单（Recipes）
+
+**适用场景：** 记录家常菜需要哪些用料，做饭前查料、照着做
+
+- 菜名、分类、份量、用料清单（食材 + 自由文本用量）、分步骤做法、备注
+- 搜索同时匹配菜名与食材名，可以反查「家里有茄子能做什么」
+- 食材名自动补全（来自本人已有记录），避免「番茄」和「西红柿」混用导致搜不到
+- 列表折叠态只显示食材名，展开看用量；详情页 `/recipes/[id]` 用大字号分步骤呈现，适合做饭时看
+- 入口在首页顶栏的账号菜单里；该模块不使用 ok/warning/danger 状态色，避免稀释倒计时的状态语义
 
 ### 通用功能
 

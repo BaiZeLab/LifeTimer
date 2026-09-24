@@ -5,10 +5,10 @@ import { createPortal } from "react-dom";
 import {
   Plus, Search, X, LayoutGrid, RefreshCw, RotateCcw, Trash2, PlusCircle,
   AlertTriangle, ChevronDown, ChevronUp, AlertCircle, Pencil, Archive,
-  TrendingDown, MoreHorizontal, Timer, Gauge, LogOut, Settings, LogIn,
-  Sun, Moon, BellOff, Webhook,
+  TrendingDown, MoreHorizontal, Timer, Gauge, LogIn, Sun, Moon,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { AccountMenu } from "@/components/AccountMenu";
 import Link from "next/link";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -17,8 +17,7 @@ import type {
   DeadlineItemDTO, ConsumptionItemDTO, DeadlineRenewal, ConsumptionLog,
   ItemStatus, CreateItemBody, PatchItemBody, RenewBody, CreateLogBody, PatchLogBody,
 } from "@/types/api";
-import { useSession, signOut } from "@/lib/auth-client";
-import { usePushSubscription } from "@/lib/use-push-subscription";
+import { useSession } from "@/lib/auth-client";
 import { calcDeadlineMetrics, calcConsumptionEstimate } from "@/lib/algorithms";
 import type { LogRow } from "@/lib/algorithms";
 import {
@@ -1957,10 +1956,6 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
     }
   }, []);
 
-  // ── Push subscription (only in authenticated, non-demo mode) ──────────────
-  const { subscribed: pushSubscribed, loading: pushLoading, supported: pushSupported, iosNeedsPWA, toggle: togglePush }
-    = usePushSubscription(!isDemo && !!user);
-
   // ── Core state ────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>("deadline");
   const [query, setQuery] = useState("");
@@ -2253,116 +2248,33 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
 
         {/* ── Page Header ── */}
         <div className="lt-home-header" style={{ padding: isDemo ? "28px 0 24px" : "32px 0 24px" }}>
-          <div>
-            <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--lt-ink-1)", letterSpacing: "-0.025em", lineHeight: 1.1, margin: 0 }}>
-              Life Timer
-            </h1>
-            {!isDemo && user && (
-              <div className="lt-user-badge" style={{ marginTop: "6px" }}>
-                <span className="lt-user-badge-name">{user.name}</span>
-                {isAdmin && (
-                  <Link href="/admin/users" title="用户管理"
-                    style={{ color: "var(--lt-ink-3)", display: "flex", alignItems: "center" }}>
-                    <Settings size={13} strokeWidth={1.8} />
-                  </Link>
-                )}
-                <button
-                  className="lt-signout-btn"
-                  onClick={() => signOut().then(() => (window.location.href = "/auth/login"))}
-                  title="退出登录"
-                >
-                  <LogOut size={12} strokeWidth={2} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />
-                  退出
-                </button>
-              </div>
-            )}
-          </div>
+          <h1 className="lt-home-title">Life Timer</h1>
 
           <div className="lt-home-header-actions">
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
-              style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-ink-3)",
-                transition: "transform 120ms ease-out",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
-            </button>
-
-            {/* Notification: subscribe when off, links to /webhook (history + unsubscribe) once on */}
-            {!isDemo && user && pushSupported && !pushSubscribed && (
+            {/* Demo has no account, so the theme toggle stays out in the open */}
+            {isDemo && (
               <button
-                onClick={togglePush}
-                disabled={pushLoading}
-                title="开启推送通知"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
                 style={{
                   flexShrink: 0,
                   width: "44px", height: "44px", borderRadius: "9999px",
                   background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                  border: "none", cursor: pushLoading ? "default" : "pointer",
+                  border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: "var(--lt-ink-3)",
-                  opacity: pushLoading ? 0.6 : 1,
                   transition: "transform 120ms ease-out",
                 }}
-                onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.transform = "scale(1.07)"; }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
                 onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
-                <BellOff size={18} strokeWidth={1.8} />
-              </button>
-            )}
-            {!isDemo && user && pushSupported && pushSubscribed && (
-              <Link href="/webhook" title="通知" style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-ink-1)", boxShadow: "var(--lt-card-shadow)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-on-ink)", textDecoration: "none",
-                transition: "transform 120ms ease-out",
-              }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.07)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
-              >
-                <Webhook size={18} strokeWidth={1.8} />
-              </Link>
-            )}
-            {!isDemo && user && iosNeedsPWA && (
-              <button
-                title="iOS 推送需要先添加到主屏幕 — 点击分享 → 添加到主屏幕"
-                style={{
-                  flexShrink: 0,
-                  width: "44px", height: "44px", borderRadius: "9999px",
-                  background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                  border: "1.5px dashed var(--lt-border)", cursor: "default",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "var(--lt-ink-4)",
-                }}
-                onClick={() => alert("iOS 推送通知需要将 Life Timer 添加到主屏幕后才能使用。\n\n步骤：Safari → 底部分享按钮 → 添加到主屏幕 → 从主屏幕打开 App")}
-              >
-                <BellOff size={18} strokeWidth={1.5} />
+                {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
               </button>
             )}
 
-            {/* Archive */}
-            {!isDemo && (
-              <Link href="/archived" title="已归档" style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-surface)", boxShadow: "var(--lt-card-shadow)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-ink-3)", textDecoration: "none",
-              }}>
-                <Archive size={18} strokeWidth={1.8} />
-              </Link>
+            {/* Recipes, archive, theme, push and account actions all live in here */}
+            {!isDemo && user && (
+              <AccountMenu userName={user.name} isAdmin={isAdmin} />
             )}
 
             {/* Add item (primary action, always visible) */}

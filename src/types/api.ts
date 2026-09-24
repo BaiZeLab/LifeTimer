@@ -77,6 +77,30 @@ export interface ConsumptionLog {
 
 export type ItemDTO = DeadlineItemDTO | ConsumptionItemDTO;
 
+// ── Recipe ────────────────────────────────────────────────────────────────────
+
+export interface RecipeIngredient {
+  name: string;
+  quantity: string;  // free text: "2 个" / "适量" / "300g"; "" = not recorded
+}
+
+/** List payload — carries ingredients (the main thing users look up) but only a step count. */
+export interface RecipeSummaryDTO {
+  id: number;
+  name: string;
+  category: string | null;
+  servings: string | null;
+  notes: string | null;
+  ingredients: RecipeIngredient[];
+  stepCount: number;   // computed
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipeDTO extends RecipeSummaryDTO {
+  steps: string[];
+}
+
 // ── Request bodies ────────────────────────────────────────────────────────────
 
 export interface CreateDeadlineBody {
@@ -125,4 +149,23 @@ export interface PatchLogBody {
   isAnomaly?: boolean;
   notes?: string;
   value?: number;
+}
+
+export interface CreateRecipeBody {
+  name: string;
+  category?: string;
+  servings?: string;
+  notes?: string;
+  ingredients?: RecipeIngredient[];
+  steps?: string[];
+}
+
+/** Ingredients and steps are replaced as a whole when present. */
+export interface PatchRecipeBody {
+  name?: string;
+  category?: string | null;
+  servings?: string | null;
+  notes?: string | null;
+  ingredients?: RecipeIngredient[];
+  steps?: string[];
 }
