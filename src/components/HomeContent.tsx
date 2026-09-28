@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useReducer } from "rea
 import { createPortal } from "react-dom";
 import {
   Plus, Search, X, LayoutGrid, RefreshCw, RotateCcw, Trash2, PlusCircle,
-  AlertTriangle, ChevronDown, ChevronUp, AlertCircle, Pencil, Archive,
+  AlertTriangle, ChevronDown, ChevronUp, Pencil, Archive,
   TrendingDown, MoreHorizontal, Timer, Gauge, LogIn, Sun, Moon,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -508,9 +508,9 @@ function ConsumptionHeatmap({ logs, unit, status }: {
   unit: string;
   status: ItemStatus;
 }) {
-  const validLogs = logs
-    .filter((l) => !l.isAnomaly)
-    .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
+  const validLogs = [...logs].sort(
+    (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
+  );
 
   if (validLogs.length < 2) return null;
 
@@ -688,7 +688,7 @@ function ConsumptionChart({ logs, unit, estimatedDays, status, chartId, timeRang
     ? Date.now() - Number(timeRange) * 86_400_000
     : 0;
 
-  const validLogs = logs.filter((l) => !l.isAnomaly && (cutoff === 0 || new Date(l.recordedAt).getTime() >= cutoff)).sort(
+  const validLogs = logs.filter((l) => cutoff === 0 || new Date(l.recordedAt).getTime() >= cutoff).sort(
     (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
   );
   if (validLogs.length < 2) return null;
@@ -1122,19 +1122,6 @@ function ConsumptionCard({
     } finally { setSavingLog(false); }
   };
 
-  const toggleAnomaly = async (log: ConsumptionLog) => {
-    if (onPatchLog) {
-      await onPatchLog(item.id, log.id, { isAnomaly: !log.isAnomaly });
-    } else {
-      await fetch(`/api/items/${item.id}/logs/${log.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isAnomaly: !log.isAnomaly }),
-      });
-    }
-    await loadLogs();
-  };
-
   const deleteLog = async (logId: number) => {
     if (onDeleteLog) {
       await onDeleteLog(item.id, logId);
@@ -1315,7 +1302,6 @@ function ConsumptionCard({
             <div key={log.id} style={{
               padding: "8px 0",
               borderBottom: "1px solid var(--lt-border-muted)",
-              opacity: log.isAnomaly ? 0.5 : 1,
             }}>
               {editingLogId === log.id ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -1362,11 +1348,6 @@ function ConsumptionCard({
                           background: "var(--lt-tag-bg)", padding: "1px 6px", borderRadius: "9999px",
                         }}>充值</span>
                       )}
-                      {log.isAnomaly && (
-                        <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--lt-danger)", display: "flex", alignItems: "center", gap: "2px" }}>
-                          <AlertCircle size={10} />异常
-                        </span>
-                      )}
                     </div>
                     {log.notes && <div style={{ fontSize: "11px", color: "var(--lt-ink-4)" }}>{log.notes}</div>}
                   </div>
@@ -1377,18 +1358,6 @@ function ConsumptionCard({
                       background: "transparent", color: "var(--lt-ink-4)", cursor: "pointer", display: "flex", alignItems: "center",
                     }}>
                       <Pencil size={11} />
-                    </button>
-                    <button
-                      title={log.isAnomaly ? "取消标记异常" : "标记为异常"}
-                      onClick={() => toggleAnomaly(log)}
-                      style={{
-                        padding: "3px 6px", borderRadius: "6px", border: "none",
-                        background: log.isAnomaly ? "var(--lt-danger-hover-bg)" : "transparent",
-                        color: log.isAnomaly ? "var(--lt-danger)" : "var(--lt-ink-4)",
-                        cursor: "pointer", fontSize: "11px", fontWeight: 600,
-                      }}
-                    >
-                      {log.isAnomaly ? "恢复" : "异常"}
                     </button>
                     <button title="删除此条记录" onClick={() => setLogDeleteTarget(log.id)} style={{
                       padding: "3px", borderRadius: "6px", border: "none",
@@ -1833,12 +1802,20 @@ function LogModal({
   const [value, setValue] = useState("");
   const [recordedAt, setRecordedAt] = useState(todayLocal);
   const [notes, setNotes] = useState("");
+  const [markTopup, setMarkTopup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (item) { setValue(""); setRecordedAt(todayLocal); setNotes(""); setError(""); }
+    if (item) {
+      setValue(""); setRecordedAt(todayLocal); setNotes(""); setMarkTopup(false); setError("");
+    }
   }, [item, todayLocal]);
+
+  const numericValue = parseFloat(value);
+  const previousValue = item?.lastRecordedValue ?? null;
+  const autoTopup = previousValue != null && !Number.isNaN(numericValue) && numericValue > previousValue;
+  const isTopup = autoTopup || markTopup;
 
   const handleSave = async () => {
     const num = parseFloat(value);
@@ -1850,6 +1827,7 @@ function LogModal({
         value: num,
         recordedAt: new Date(recordedAt).toISOString(),
         notes: notes || undefined,
+        isTopup: isTopup || undefined,
       };
 
       if (onSaveOverride) {
@@ -1892,6 +1870,45 @@ function LogModal({
             <input className="lt-input" type="date" value={recordedAt}
               onChange={(e) => setRecordedAt(e.target.value)} />
           </div>
+          {previousValue != null && (
+            <div className="lt-field">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={isTopup}
+                onClick={() => { if (!autoTopup) setMarkTopup((v) => !v); }}
+                style={{
+                  minHeight: "44px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  padding: "0 14px",
+                  borderRadius: "12px",
+                  border: isTopup ? "1.5px solid var(--lt-ok-deep)" : "1.5px solid var(--lt-border)",
+                  background: isTopup ? "var(--lt-tag-bg)" : "var(--lt-surface)",
+                  color: "var(--lt-ink-1)",
+                  cursor: autoTopup ? "default" : "pointer",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                }}
+              >
+                <span>充值</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: isTopup ? "var(--lt-ok-deep)" : "var(--lt-ink-4)" }}>
+                  {isTopup ? "已标记" : "未标记"}
+                </span>
+              </button>
+              <div style={{ fontSize: "12px", color: "var(--lt-ink-4)", lineHeight: 1.5 }}>
+                {autoTopup
+                  ? "示数高于上一条，保存后记为充值"
+                  : isTopup
+                    ? "本条与上一条之间不计入消耗"
+                    : "充值后示数没有升高时，可手动标记"}
+              </div>
+            </div>
+          )}
           <div className="lt-field">
             <label className="lt-label" style={{ color: "var(--lt-ink-3)" }}>备注（可选）</label>
             <textarea className="lt-textarea" value={notes} onChange={(e) => setNotes(e.target.value)}
@@ -2030,7 +2047,6 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
         recorded_at: l.recordedAt,
         value: l.value,
         is_topup: l.isTopup,
-        is_anomaly: l.isAnomaly,
       }));
       const sorted = [...logRows].sort(
         (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
@@ -2156,14 +2172,17 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
 
   const demoOnSaveLog = isDemo
     ? async (itemId: number, body: CreateLogBody) => {
+        const existing = demoLogsRef.current.get(itemId) ?? [];
+        const prev = [...existing].sort(
+          (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+        )[0];
         const newLog: ConsumptionLog = {
           id: nextDemoId(), itemId,
           recordedAt: body.recordedAt,
           value: body.value,
-          isTopup: false, isAnomaly: false,
+          isTopup: body.isTopup === true || (prev != null && body.value > prev.value),
           notes: body.notes ?? null,
         };
-        const existing = demoLogsRef.current.get(itemId) ?? [];
         demoLogsRef.current.set(itemId, [...existing, newLog]);
         demoRecalcConsumption(itemId);
       }

@@ -28,9 +28,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const body: PatchLogBody = await req.json().catch(() => ({}));
 
-  if (body.isAnomaly !== undefined) {
-    await sql`UPDATE consumption_logs SET is_anomaly = ${body.isAnomaly} WHERE id = ${numLogId}`;
-  }
   if (body.notes !== undefined) {
     await sql`UPDATE consumption_logs SET notes = ${body.notes} WHERE id = ${numLogId}`;
   }
@@ -41,13 +38,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const [updated] = await sql`SELECT * FROM consumption_logs WHERE id = ${numLogId}` as {
     id: number; item_id: number; recorded_at: string; value: number;
-    is_topup: boolean; is_anomaly: boolean; notes: string | null;
+    is_topup: boolean; notes: string | null;
   }[];
 
   return NextResponse.json({
     log: {
       id: updated.id, itemId: updated.item_id, recordedAt: updated.recorded_at,
-      value: updated.value, isTopup: updated.is_topup, isAnomaly: updated.is_anomaly, notes: updated.notes,
+      value: updated.value, isTopup: updated.is_topup, notes: updated.notes,
     },
     item: await getConsumptionItem(numId, session.user.id),
   });

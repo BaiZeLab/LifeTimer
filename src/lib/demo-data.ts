@@ -60,7 +60,6 @@ function makeConsumption(
     recorded_at: daysAgo(l.daysAgoOffset),
     value: l.value,
     is_topup: l.isTopup ?? false,
-    is_anomaly: false,
   }));
 
   const sorted = [...logs].sort(
@@ -138,7 +137,6 @@ export function buildDemoLogs(): Map<number, ConsumptionLog[]> {
     recordedAt: daysAgo(raw.daysAgoOffset),
     value: raw.value,
     isTopup: raw.isTopup ?? false,
-    isAnomaly: false,
     notes: null,
   });
 

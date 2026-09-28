@@ -205,7 +205,7 @@ deadline_renewals (id, item_id, renewed_at, old_expire_date, new_expire_date, no
 
 -- 消耗预估类
 consumption_items (item_id, unit, alert_days)
-consumption_logs (id, item_id, recorded_at, value, is_topup, is_anomaly, notes)
+consumption_logs (id, item_id, recorded_at, value, is_topup, notes)
 
 -- 菜单（与 items 无关：菜品没有时间维度和状态，不复用条目模型）
 recipes (id, user_id, name, category, servings, notes, created_at, updated_at)
@@ -255,8 +255,7 @@ Schema 变更通过 `src/lib/schema.ts` 中的 `migrate()` 幂等迁移，服务
 
 **适用场景：** 预付费水表（m³）、电表（度）、流量卡（GB）等
 
-- 支持 2 位小数示数录入，自动识别充值（新值 > 上条 → 新消耗分段）
-- 支持标记异常值，异常记录不计入速率计算
+- 支持 2 位小数示数录入。新示数大于上一条时自动记为充值；录入时也可以手动标记充值。充值与上一条之间不计入消耗
 - **消耗速率算法**：按充值事件切分分段 → 各段日均速率 → 指数衰减加权平均 → 外推估算余量和耗尽日期
 - 消耗趋势图（折线图 + 预测线）+ 消耗热力图
 

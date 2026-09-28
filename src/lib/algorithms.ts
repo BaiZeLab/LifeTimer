@@ -4,7 +4,6 @@ export interface LogRow {
   recorded_at: string;
   value: number;
   is_topup: boolean | number;
-  is_anomaly: boolean | number;
 }
 
 export interface ConsumptionEstimate {
@@ -19,7 +18,7 @@ export interface ConsumptionEstimate {
  * Calculate weighted average daily consumption rate and derived metrics.
  *
  * Algorithm:
- * 1. Sort and filter anomaly logs.
+ * 1. Sort logs by recorded time.
  * 2. For each consecutive pair of logs, compute the interval consumption rate.
  *    Pairs that cross a topup (value increases) are skipped.
  * 3. Weight each interval by two factors multiplied together:
@@ -49,20 +48,17 @@ export function calcConsumptionEstimate(
 
   if (logs.length < 2) return empty;
 
-  // Filter anomalies for rate calculation; keep all logs for value projection
-  const validLogs = [...logs]
-    .filter((l) => !l.is_anomaly)
-    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
-
-  if (validLogs.length < 2) return empty;
+  const sorted = [...logs].sort(
+    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+  );
 
   const now = Date.now();
   let weightedRateSum = 0;
   let weightSum = 0;
 
-  for (let i = 0; i < validLogs.length - 1; i++) {
-    const a = validLogs[i];
-    const b = validLogs[i + 1];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
 
     // A topup causes value to rise — skip this pair (it's not a consumption interval)
     if (b.is_topup || b.value >= a.value) continue;
@@ -89,11 +85,7 @@ export function calcConsumptionEstimate(
   const dailyRate = weightedRateSum / weightSum;
   if (dailyRate <= 0) return empty;
 
-  // Project from the most recent log (including anomaly logs for current value)
-  const allSorted = [...logs].sort(
-    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-  );
-  const lastLog = allSorted[allSorted.length - 1];
+  const lastLog = sorted[sorted.length - 1];
   const daysSinceLast = (now - new Date(lastLog.recorded_at).getTime()) / 86_400_000;
   const estimatedValue = Math.max(0, lastLog.value - daysSinceLast * dailyRate);
   const estimatedDays = Math.floor(estimatedValue / dailyRate);

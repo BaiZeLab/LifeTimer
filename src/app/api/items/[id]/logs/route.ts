@@ -46,7 +46,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const prevRows = await sql`
     SELECT value FROM consumption_logs WHERE item_id = ${numId} ORDER BY recorded_at DESC LIMIT 1
   ` as { value: number }[];
-  const isTopup = prevRows[0] ? body.value > prevRows[0].value : false;
+  const autoTopup = prevRows[0] ? body.value > prevRows[0].value : false;
+  const isTopup = body.isTopup === true || autoTopup;
 
   const [log] = await sql`
     INSERT INTO consumption_logs (item_id, recorded_at, value, is_topup, notes)
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     RETURNING *
   ` as {
     id: number; item_id: number; recorded_at: string; value: number;
-    is_topup: boolean; is_anomaly: boolean; notes: string | null;
+    is_topup: boolean; notes: string | null;
   }[];
 
   await sql`UPDATE items SET updated_at = ${new Date().toISOString()} WHERE id = ${numId}`;
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   return NextResponse.json({
     log: {
       id: log.id, itemId: log.item_id, recordedAt: log.recorded_at,
-      value: log.value, isTopup: log.is_topup, isAnomaly: log.is_anomaly, notes: log.notes,
+      value: log.value, isTopup: log.is_topup, notes: log.notes,
     },
     item: await getConsumptionItem(numId, session.user.id),
   }, { status: 201 });

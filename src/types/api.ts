@@ -69,7 +69,6 @@ export interface ConsumptionLog {
   recordedAt: string;
   value: number;
   isTopup: boolean;
-  isAnomaly: boolean;
   notes: string | null;
 }
 
@@ -143,10 +142,11 @@ export interface CreateLogBody {
   recordedAt: string;
   value: number;
   notes?: string;
+  /** Force this reading to be a top-up even when the value did not rise. */
+  isTopup?: boolean;
 }
 
 export interface PatchLogBody {
-  isAnomaly?: boolean;
   notes?: string;
   value?: number;
 }

@@ -204,10 +204,11 @@ export async function migrate(): Promise<void> {
       recorded_at TEXT    NOT NULL,
       value       REAL    NOT NULL,
       is_topup    BOOLEAN NOT NULL DEFAULT FALSE,
-      is_anomaly  BOOLEAN NOT NULL DEFAULT FALSE,
       notes       TEXT
     )
   `;
+
+  await sql`ALTER TABLE consumption_logs DROP COLUMN IF EXISTS is_anomaly`;
 
   // ── items.user_id: add column + FK (idempotent) ───────────────────────
 

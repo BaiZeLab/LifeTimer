@@ -32,7 +32,6 @@ interface LogRow {
   recorded_at: string;
   value: number;
   is_topup: boolean;
-  is_anomaly: boolean;
   notes: string | null;
 }
 
@@ -216,7 +215,6 @@ export async function getConsumptionLogs(itemId: number): Promise<ConsumptionLog
     recordedAt: r.recorded_at,
     value: r.value,
     isTopup: r.is_topup,
-    isAnomaly: r.is_anomaly,
     notes: r.notes,
   }));
 }
