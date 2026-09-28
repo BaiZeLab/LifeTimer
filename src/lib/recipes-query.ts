@@ -1,4 +1,5 @@
 import sql from "./db";
+import { normaliseKind } from "./seasonings";
 import type { RecipeDTO, RecipeSummaryDTO, RecipeIngredient } from "@/types/api";
 
 // ── Raw row types ──────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ interface IngredientRow {
   recipe_id: number;
   name: string;
   quantity: string;
+  kind: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -31,7 +33,7 @@ async function fetchIngredientsByRecipeIds(
 ): Promise<Map<number, RecipeIngredient[]>> {
   if (recipeIds.length === 0) return new Map();
   const rows = await sql`
-    SELECT recipe_id, name, quantity
+    SELECT recipe_id, name, quantity, kind
     FROM recipe_ingredients
     WHERE recipe_id = ANY(${recipeIds})
     ORDER BY recipe_id, position, id
@@ -40,7 +42,7 @@ async function fetchIngredientsByRecipeIds(
   const map = new Map<number, RecipeIngredient[]>();
   for (const r of rows) {
     const arr = map.get(r.recipe_id) ?? [];
-    arr.push({ name: r.name, quantity: r.quantity });
+    arr.push({ name: r.name, quantity: r.quantity, kind: normaliseKind(r.kind) });
     map.set(r.recipe_id, arr);
   }
   return map;
@@ -148,25 +150,35 @@ export async function getRecipeOwner(id: number): Promise<string | null> {
   return rows[0]?.user_id ?? null;
 }
 
-/** Distinct ingredient names already used by this user — powers input autocomplete. */
-export async function getIngredientNames(userId: string): Promise<string[]> {
-  const rows = await sql`
-    SELECT DISTINCT i.name
-    FROM recipe_ingredients i
-    JOIN recipes r ON r.id = i.recipe_id
-    WHERE r.user_id = ${userId}
-    ORDER BY i.name
-  ` as { name: string }[];
-  return rows.map((r) => r.name);
-}
-
 // ── Input normalisation ────────────────────────────────────────────────────
 
-/** Drop blank rows and trim; ingredients without a name are meaningless. */
+/**
+ * Drop blank rows and trim. Seasonings carry no amount. A name kept as a main
+ * ingredient is not also stored as a seasoning. Mains stay in entry order,
+ * seasonings follow them.
+ */
 export function normaliseIngredients(input: RecipeIngredient[] | undefined): RecipeIngredient[] {
-  return (input ?? [])
-    .map((i) => ({ name: (i?.name ?? "").trim(), quantity: (i?.quantity ?? "").trim() }))
-    .filter((i) => i.name.length > 0);
+  const cleaned = (input ?? [])
+    .map((ingredient) => {
+      const kind = normaliseKind(ingredient?.kind);
+      return {
+        name: (ingredient?.name ?? "").trim(),
+        quantity: kind === "seasoning" ? "" : (ingredient?.quantity ?? "").trim(),
+        kind,
+      };
+    })
+    .filter((ingredient) => ingredient.name.length > 0);
+
+  const mains = cleaned.filter((ingredient) => ingredient.kind === "main");
+  const mainNames = new Set(mains.map((ingredient) => ingredient.name));
+  const seenSeasoning = new Set<string>();
+  const seasonings = cleaned.filter((ingredient) => {
+    if (ingredient.kind !== "seasoning") return false;
+    if (mainNames.has(ingredient.name) || seenSeasoning.has(ingredient.name)) return false;
+    seenSeasoning.add(ingredient.name);
+    return true;
+  });
+  return [...mains, ...seasonings];
 }
 
 export function normaliseSteps(input: string[] | undefined): string[] {

@@ -78,9 +78,13 @@ export type ItemDTO = DeadlineItemDTO | ConsumptionItemDTO;
 
 // ── Recipe ────────────────────────────────────────────────────────────────────
 
+/** `seasoning` has no amount; `main` is a measured row. Missing values are treated as main. */
+export type IngredientKind = "main" | "seasoning";
+
 export interface RecipeIngredient {
   name: string;
   quantity: string;  // free text: "2 个" / "适量" / "300g"; "" = not recorded
+  kind?: IngredientKind;
 }
 
 /** List payload — carries ingredients (the main thing users look up) but only a step count. */

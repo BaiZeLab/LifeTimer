@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Pencil, RefreshCw, ChevronDown } from "lucide-react";
 import { RecipeFormModal } from "@/components/RecipeFormModal";
+import { RecipeIngredientList, RecipeIngredientSummary } from "@/components/RecipeIngredientList";
+import { CopyIngredientsButton } from "@/components/CopyIngredientsButton";
 import type { RecipeDTO } from "@/types/api";
 
 export default function RecipeDetailPage() {
@@ -86,49 +88,37 @@ export default function RecipeDetailPage() {
 
         {/* Ingredients — collapsed by default: once you've prepped, steps are what matter */}
         <div className="lt-card" style={{ gap: "10px", padding: "16px 18px", marginBottom: "14px" }}>
-          <button
-            onClick={() => setIngredientsOpen((v) => !v)}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              gap: "12px", width: "100%", minHeight: "28px",
-              background: "transparent", border: "none", padding: 0, cursor: "pointer",
-              textAlign: "left", fontFamily: "inherit",
-            }}
-          >
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--lt-ink-2)" }}>
-              用料 {recipe.ingredients.length > 0 && `(${recipe.ingredients.length})`}
-            </span>
-            <ChevronDown
-              size={16}
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <button
+              onClick={() => setIngredientsOpen((v) => !v)}
               style={{
-                color: "var(--lt-ink-4)", flexShrink: 0,
-                transform: ingredientsOpen ? "rotate(180deg)" : "none",
-                transition: "transform 180ms ease-out",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: "12px", flex: 1, minWidth: 0, minHeight: "44px",
+                background: "transparent", border: "none", padding: 0, cursor: "pointer",
+                textAlign: "left", fontFamily: "inherit",
               }}
-            />
-          </button>
+            >
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--lt-ink-2)" }}>
+                用料 {recipe.ingredients.length > 0 && `(${recipe.ingredients.length})`}
+              </span>
+              <ChevronDown
+                size={16}
+                style={{
+                  color: "var(--lt-ink-4)", flexShrink: 0,
+                  transform: ingredientsOpen ? "rotate(180deg)" : "none",
+                  transition: "transform 180ms ease-out",
+                }}
+              />
+            </button>
+            <CopyIngredientsButton dishName={recipe.name} ingredients={recipe.ingredients} />
+          </div>
 
           {recipe.ingredients.length === 0 ? (
             <div style={{ fontSize: "13px", color: "var(--lt-ink-4)" }}>还没有记录用料</div>
           ) : ingredientsOpen ? (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {recipe.ingredients.map((ing, idx) => (
-                <div key={idx} style={{
-                  display: "flex", justifyContent: "space-between", gap: "12px",
-                  padding: "8px 0", fontSize: "14px",
-                  borderBottom: idx === recipe.ingredients.length - 1 ? "none" : "1px solid var(--lt-border-muted)",
-                }}>
-                  <span style={{ color: "var(--lt-ink-2)" }}>{ing.name}</span>
-                  <span style={{ color: ing.quantity ? "var(--lt-ink-3)" : "var(--lt-ink-4)", flexShrink: 0 }}>
-                    {ing.quantity || "适量"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <RecipeIngredientList ingredients={recipe.ingredients} />
           ) : (
-            <div style={{ fontSize: "13px", color: "var(--lt-ink-3)", lineHeight: 1.6 }}>
-              {recipe.ingredients.map((i) => i.name).join(" · ")}
-            </div>
+            <RecipeIngredientSummary ingredients={recipe.ingredients} />
           )}
         </div>
 

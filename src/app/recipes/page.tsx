@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RecipeFormModal } from "@/components/RecipeFormModal";
+import { RecipeIngredientList, RecipeIngredientSummary } from "@/components/RecipeIngredientList";
+import { CopyIngredientsButton } from "@/components/CopyIngredientsButton";
 import type { RecipeDTO, RecipeSummaryDTO } from "@/types/api";
 
 // ── DeleteConfirmModal ────────────────────────────────────────────────────────
@@ -64,8 +66,6 @@ function DeleteConfirmModal({ target, onClose, onConfirm }: {
 
 // ── RecipeCard ────────────────────────────────────────────────────────────────
 
-const SUMMARY_LIMIT = 6;
-
 function RecipeCard({ recipe, expanded, onToggle, onEdit, onDelete }: {
   recipe: RecipeSummaryDTO;
   expanded: boolean;
@@ -73,12 +73,9 @@ function RecipeCard({ recipe, expanded, onToggle, onEdit, onDelete }: {
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const shown = recipe.ingredients.slice(0, SUMMARY_LIMIT);
-  const rest = recipe.ingredients.length - shown.length;
-
   return (
     <div className="lt-card" onClick={onToggle} style={{ cursor: "pointer", gap: "12px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {recipe.category && (
             <span className="lt-tag" style={{ marginBottom: "6px" }}>{recipe.category}</span>
@@ -89,22 +86,17 @@ function RecipeCard({ recipe, expanded, onToggle, onEdit, onDelete }: {
           }}>
             {recipe.name}
           </div>
+          {recipe.stepCount > 0 && (
+            <div style={{ fontSize: "12px", color: "var(--lt-ink-4)", marginTop: "2px" }}>
+              {recipe.stepCount} 步做法
+            </div>
+          )}
         </div>
-        <div style={{
-          flexShrink: 0, textAlign: "right", fontSize: "12px",
-          color: "var(--lt-ink-4)", lineHeight: 1.6, paddingTop: "2px",
-        }}>
-          <div>{recipe.ingredients.length} 种用料</div>
-          {recipe.stepCount > 0 && <div>{recipe.stepCount} 步做法</div>}
-        </div>
+        <CopyIngredientsButton dishName={recipe.name} ingredients={recipe.ingredients} />
       </div>
 
-      {/* Collapsed: ingredient names only — answers "what goes in this" without a tap */}
       {!expanded && recipe.ingredients.length > 0 && (
-        <div style={{ fontSize: "13px", color: "var(--lt-ink-3)", lineHeight: 1.6 }}>
-          {shown.map((i) => i.name).join(" · ")}
-          {rest > 0 && <span style={{ color: "var(--lt-ink-4)" }}> +{rest}</span>}
-        </div>
+        <RecipeIngredientSummary ingredients={recipe.ingredients} />
       )}
 
       {!expanded && recipe.ingredients.length === 0 && (
@@ -115,21 +107,7 @@ function RecipeCard({ recipe, expanded, onToggle, onEdit, onDelete }: {
       {expanded && (
         <div onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}>
           {recipe.ingredients.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              {recipe.ingredients.map((ing, idx) => (
-                <div key={idx} style={{
-                  display: "flex", justifyContent: "space-between", gap: "12px",
-                  padding: "7px 0",
-                  borderBottom: idx === recipe.ingredients.length - 1 ? "none" : "1px solid var(--lt-border-muted)",
-                  fontSize: "14px",
-                }}>
-                  <span style={{ color: "var(--lt-ink-2)" }}>{ing.name}</span>
-                  <span style={{ color: ing.quantity ? "var(--lt-ink-3)" : "var(--lt-ink-4)", flexShrink: 0 }}>
-                    {ing.quantity || "适量"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <RecipeIngredientList ingredients={recipe.ingredients} />
           )}
 
           {recipe.servings && (

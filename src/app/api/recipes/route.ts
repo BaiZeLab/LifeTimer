@@ -47,12 +47,13 @@ export async function POST(req: NextRequest) {
         RETURNING id
       ),
       _ingredients AS (
-        INSERT INTO recipe_ingredients (recipe_id, name, quantity, position)
-        SELECT r.id, t.name, t.quantity, t.ord
+        INSERT INTO recipe_ingredients (recipe_id, name, quantity, kind, position)
+        SELECT r.id, t.name, t.quantity, t.kind, t.ord
         FROM new_recipe r,
              unnest(${ingredients.map((i) => i.name)}::text[],
-                    ${ingredients.map((i) => i.quantity)}::text[])
-             WITH ORDINALITY AS t(name, quantity, ord)
+                    ${ingredients.map((i) => i.quantity)}::text[],
+                    ${ingredients.map((i) => i.kind ?? "main")}::text[])
+             WITH ORDINALITY AS t(name, quantity, kind, ord)
       ),
       _steps AS (
         INSERT INTO recipe_steps (recipe_id, content, position)

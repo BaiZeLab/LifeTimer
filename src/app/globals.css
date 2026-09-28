@@ -606,6 +606,75 @@ html.dark .lt-tag-input-wrap:focus-within {
   background: oklch(81% 0.032 55 / 0.5);
 }
 
+/* Seasonings are names only. The field stays one row until tags wrap,
+   and each remove control keeps a 44px target. */
+.lt-seasoning-wrap {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid var(--lt-border);
+  background: var(--lt-surface);
+  padding: 0 6px 0 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  cursor: text;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.lt-seasoning-wrap:focus-within {
+  border-color: var(--lt-ink-1);
+  box-shadow: 0 0 0 3px oklch(16% 0.040 46 / 0.10);
+}
+
+html.dark .lt-seasoning-wrap:focus-within {
+  box-shadow: 0 0 0 3px oklch(95% 0.005 88 / 0.12);
+}
+
+.lt-seasoning-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-left: 4px;
+  border-radius: 10px;
+  background: var(--lt-surface-2);
+  color: var(--lt-ink-1);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lt-seasoning-remove {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lt-ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.lt-seasoning-remove:hover { color: var(--lt-ink-1); }
+
+.lt-seasoning-input {
+  flex: 1;
+  min-width: 7em;
+  height: 44px;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  font-size: 16px;
+  color: var(--lt-ink-1);
+  font-family: inherit;
+}
+
+.lt-seasoning-input::placeholder { color: var(--lt-ink-4); }
+
 /* ─── Stat Box (consumption) ───────────────────────────────────── */
 .lt-stats-grid {
   display: grid;
@@ -1129,3 +1198,21 @@ html.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); 
 
 .lt-card-action--danger { color: var(--lt-danger); }
 .lt-card-action--danger:hover { background: var(--lt-danger-hover-bg); color: var(--lt-danger); }
+
+.lt-copy-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--lt-ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.lt-copy-btn:hover { background: var(--lt-surface-2); color: var(--lt-ink-1); }

@@ -63,11 +63,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (ingredients) {
       queries.push(txSql`DELETE FROM recipe_ingredients WHERE recipe_id = ${numId}`);
       queries.push(txSql`
-        INSERT INTO recipe_ingredients (recipe_id, name, quantity, position)
-        SELECT ${numId}, t.name, t.quantity, t.ord
+        INSERT INTO recipe_ingredients (recipe_id, name, quantity, kind, position)
+        SELECT ${numId}, t.name, t.quantity, t.kind, t.ord
         FROM unnest(${ingredients.map((i) => i.name)}::text[],
-                    ${ingredients.map((i) => i.quantity)}::text[])
-             WITH ORDINALITY AS t(name, quantity, ord)
+                    ${ingredients.map((i) => i.quantity)}::text[],
+                    ${ingredients.map((i) => i.kind ?? "main")}::text[])
+             WITH ORDINALITY AS t(name, quantity, kind, ord)
       `);
       queries.push(txSql`UPDATE recipes SET updated_at = ${now} WHERE id = ${numId}`);
     }

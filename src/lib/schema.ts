@@ -1,4 +1,5 @@
 import sql from "./db";
+import { SEASONING_SEEDS } from "./seasonings";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -341,6 +342,10 @@ export async function migrate(): Promise<void> {
   // `quantity` is free text ("2 个" / "适量" / "300g") and NOT NULL DEFAULT ''
   // because household amounts are rarely clean numbers; an empty string means
   // "not recorded".
+  //
+  // `kind` is 'main' or 'seasoning'. Seasonings are an open list entered as
+  // names only, so an empty quantity is not enough to tell them apart from a
+  // main ingredient whose amount was left blank.
 
   await sql`
     CREATE TABLE IF NOT EXISTS recipes (
@@ -361,6 +366,7 @@ export async function migrate(): Promise<void> {
       recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
       name      TEXT    NOT NULL,
       quantity  TEXT    NOT NULL DEFAULT '',
+      kind      TEXT    NOT NULL DEFAULT 'main',
       position  INTEGER NOT NULL DEFAULT 0
     )
   `;
@@ -373,6 +379,26 @@ export async function migrate(): Promise<void> {
       position  INTEGER NOT NULL DEFAULT 0
     )
   `;
+
+  // Existing databases created the table before `kind` existed. Backfill runs
+  // only on that first add: empty amounts of the seed names become seasonings.
+  // Later saves must not be rewritten just because a main ingredient has no amount.
+  const kindColumn = await sql`
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'recipe_ingredients'
+      AND column_name = 'kind'
+  ` as { "?column?": number }[];
+  if (kindColumn.length === 0) {
+    await sql`ALTER TABLE recipe_ingredients ADD COLUMN kind TEXT NOT NULL DEFAULT 'main'`;
+    await sql`
+      UPDATE recipe_ingredients
+      SET kind = 'seasoning'
+      WHERE kind = 'main'
+        AND btrim(quantity) = ''
+        AND name = ANY(${[...SEASONING_SEEDS]})
+    `;
+  }
 
   await sql`CREATE INDEX IF NOT EXISTS idx_recipes_user        ON recipes(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_recipe_ing_recipe   ON recipe_ingredients(recipe_id, position)`;

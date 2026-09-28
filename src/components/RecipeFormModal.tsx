@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { RecipeDTO, RecipeIngredient, CreateRecipeBody, PatchRecipeBody } from "@/types/api";
+import { partitionIngredients } from "@/lib/seasonings";
 
 /** New recipes open with a few blank rows so the first thing you see is where to type. */
 const BLANK_INGREDIENTS: RecipeIngredient[] = [
@@ -23,13 +24,34 @@ export function RecipeFormModal({ open, recipe, onClose, onSaved }: {
   const [servings, setServings] = useState("");
   const [notes, setNotes] = useState("");
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>(BLANK_INGREDIENTS);
+  const [seasonings, setSeasonings] = useState<string[]>([]);
+  const [seasoningDraft, setSeasoningDraft] = useState("");
   const [steps, setSteps] = useState<string[]>([""]);
-  const [knownNames, setKnownNames] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const nameInputs = useRef<(HTMLInputElement | null)[]>([]);
+  const seasoningInputRef = useRef<HTMLInputElement | null>(null);
+  const seasoningsRef = useRef<string[]>([]);
+  const seasoningDraftRef = useRef("");
+  const ingredientsRef = useRef(ingredients);
+  ingredientsRef.current = ingredients;
   const [focusRow, setFocusRow] = useState<number | null>(null);
+
+  const setSeasoningList = useCallback((next: string[]) => {
+    seasoningsRef.current = next;
+    setSeasonings(next);
+  }, []);
+
+  const commitSeasoningDraft = useCallback(() => {
+    const name = seasoningDraftRef.current.trim();
+    seasoningDraftRef.current = "";
+    setSeasoningDraft("");
+    if (!name || seasoningsRef.current.includes(name)) return;
+    const usedAsMain = ingredientsRef.current.some((row) => row.name.trim() === name);
+    if (usedAsMain) return;
+    setSeasoningList([...seasoningsRef.current, name]);
+  }, [setSeasoningList]);
 
   // Reset whenever the modal opens, so a cancelled edit never leaks into the next one
   useEffect(() => {
@@ -38,23 +60,18 @@ export function RecipeFormModal({ open, recipe, onClose, onSaved }: {
     setCategory(recipe?.category ?? "");
     setServings(recipe?.servings ?? "");
     setNotes(recipe?.notes ?? "");
+    const { mains, seasonings: savedSeasonings } = partitionIngredients(recipe?.ingredients ?? []);
     setIngredients(
-      recipe && recipe.ingredients.length > 0
-        ? [...recipe.ingredients, { name: "", quantity: "" }]
+      mains.length > 0
+        ? [...mains, { name: "", quantity: "" }]
         : BLANK_INGREDIENTS
     );
+    setSeasoningList(savedSeasonings.map((ingredient) => ingredient.name));
+    seasoningDraftRef.current = "";
+    setSeasoningDraft("");
     setSteps(recipe && recipe.steps.length > 0 ? [...recipe.steps] : [""]);
     setError("");
-  }, [open, recipe]);
-
-  // Ingredient name suggestions keep "番茄" from drifting into "西红柿"
-  useEffect(() => {
-    if (!open) return;
-    fetch("/api/recipes/ingredients")
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setKnownNames)
-      .catch(() => setKnownNames([]));
-  }, [open]);
+  }, [open, recipe, setSeasoningList]);
 
   useEffect(() => {
     if (focusRow === null) return;
@@ -84,12 +101,27 @@ export function RecipeFormModal({ open, recipe, onClose, onSaved }: {
   const handleSave = async () => {
     if (!name.trim()) { setError("菜名不能为空"); return; }
 
+    const mainNames = new Set(
+      ingredients.filter((ingredient) => ingredient.name.trim()).map((ingredient) => ingredient.name.trim())
+    );
+    commitSeasoningDraft();
     const payload: CreateRecipeBody & PatchRecipeBody = {
       name: name.trim(),
       category: category.trim() || undefined,
       servings: servings.trim() || undefined,
       notes: notes.trim() || undefined,
-      ingredients: ingredients.filter((i) => i.name.trim()),
+      ingredients: [
+        ...ingredients
+          .filter((ingredient) => ingredient.name.trim())
+          .map((ingredient) => ({
+            name: ingredient.name.trim(),
+            quantity: ingredient.quantity.trim(),
+            kind: "main" as const,
+          })),
+        ...seasoningsRef.current
+          .filter((seasoning) => !mainNames.has(seasoning))
+          .map((seasoning) => ({ name: seasoning, quantity: "", kind: "seasoning" as const })),
+      ],
       steps: steps.filter((s) => s.trim()),
     };
 
@@ -162,21 +194,18 @@ export function RecipeFormModal({ open, recipe, onClose, onSaved }: {
           {/* ── Ingredients ── */}
           <div className="lt-field">
             <label className="lt-label">
-              用料
+              主料
               <span style={{ fontWeight: 500, color: "var(--lt-ink-4)", marginLeft: "6px" }}>
                 回车可继续加一行
               </span>
             </label>
-            <datalist id="lt-ingredient-names">
-              {knownNames.map((n) => <option key={n} value={n} />)}
-            </datalist>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {ingredients.map((row, idx) => (
                 <div className="lt-ing-row" key={idx}>
                   <input
                     className="lt-input"
                     ref={(el) => { nameInputs.current[idx] = el; }}
-                    list="lt-ingredient-names"
+                    autoComplete="off"
                     value={row.name}
                     onChange={(e) => setIngredient(idx, { name: e.target.value })}
                     onKeyDown={(e) => {
@@ -211,6 +240,58 @@ export function RecipeFormModal({ open, recipe, onClose, onSaved }: {
             >
               <Plus size={13} />添加一行
             </button>
+          </div>
+
+          <div className="lt-field">
+            <label className="lt-label" htmlFor="lt-seasoning-input">
+              辅料
+              <span style={{ fontWeight: 500, color: "var(--lt-ink-4)", marginLeft: "6px" }}>
+                回车添加，不填用量
+              </span>
+            </label>
+            <div
+              className="lt-seasoning-wrap"
+              onClick={() => seasoningInputRef.current?.focus()}
+            >
+              {seasonings.map((seasoning) => (
+                <span key={seasoning} className="lt-seasoning-chip">
+                  {seasoning}
+                  <button
+                    type="button"
+                    className="lt-seasoning-remove"
+                    aria-label={`去掉${seasoning}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSeasoningList(seasoningsRef.current.filter((name) => name !== seasoning));
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              ))}
+              <input
+                id="lt-seasoning-input"
+                ref={seasoningInputRef}
+                className="lt-seasoning-input"
+                autoComplete="off"
+                value={seasoningDraft}
+                placeholder={seasonings.length === 0 ? "生抽" : ""}
+                onChange={(e) => {
+                  seasoningDraftRef.current = e.target.value;
+                  setSeasoningDraft(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitSeasoningDraft();
+                  } else if (e.key === "Backspace" && !seasoningDraft && seasonings.length > 0) {
+                    e.preventDefault();
+                    setSeasoningList(seasoningsRef.current.slice(0, -1));
+                  }
+                }}
+                onBlur={() => commitSeasoningDraft()}
+              />
+            </div>
           </div>
 
           {/* ── Steps ── */}
