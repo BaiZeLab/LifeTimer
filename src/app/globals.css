@@ -434,15 +434,39 @@ html.dark .lt-status-tick { background: oklch(95% 0.010 263 / 0.20); }
 
 .lt-fab:active { transform: scale(0.96); }
 
+/* Header add: desktop companion to the FAB. Hidden on the same
+ * breakpoint the FAB appears, so the action is never doubled. */
+.lt-header-add {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: var(--lt-fab-bg);
+  color: var(--lt-fab-color);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--lt-shadow-fab);
+  transition: transform 120ms ease-out, filter 120ms ease-out;
+}
+
+.lt-header-add:hover { transform: scale(1.07); }
+.lt-header-add:active { transform: scale(0.96); }
+
 @media (max-width: 640px) {
   .lt-fab { display: flex; }
+  .lt-header-add { display: none; }
 }
 
 /* ─── Home page header ────────────────────────────────────────────
- * One line: wordmark left, account menu + add button right. Theme,
- * push, recipes and archive used to be four more 44px circles on a
- * second row, which cost 58px of the first screen for operations used
- * at most once a day; they now live inside the account menu.
+ * One line: wordmark left, add button then account menu on the right.
+ * The account menu is the rightmost control. Theme, push, recipes and
+ * archive used to be four more 44px circles on a second row, which
+ * cost 58px of the first screen for operations used at most once a
+ * day; they now live inside the account menu.
+ * Narrow screens drop the header add — the FAB already covers it.
  * The user name is the only elastic part of the row, so a long name
  * ellipsises instead of pushing the header into a horizontal
  * overflow — hence no flex-shrink: 0 on the actions. */

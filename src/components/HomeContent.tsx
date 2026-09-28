@@ -2270,6 +2270,15 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
           <h1 className="lt-home-title">Life Timer</h1>
 
           <div className="lt-home-header-actions">
+            {/* Desktop only — narrow screens use the floating button */}
+            <button
+              className="lt-header-add"
+              onClick={() => setModalOpen(true)}
+              aria-label="新增物品"
+            >
+              <Plus size={20} strokeWidth={2.5} />
+            </button>
+
             {/* Demo has no account, so the theme toggle stays out in the open */}
             {isDemo && (
               <button
@@ -2291,30 +2300,10 @@ export function HomeContent({ isDemo = false }: { isDemo?: boolean }) {
               </button>
             )}
 
-            {/* Recipes, archive, theme, push and account actions all live in here */}
+            {/* Rightmost: recipes, archive, theme, push and account actions */}
             {!isDemo && user && (
               <AccountMenu userName={user.name} isAdmin={isAdmin} />
             )}
-
-            {/* Add item (primary action, always visible) */}
-            <button
-              onClick={() => setModalOpen(true)}
-              style={{
-                flexShrink: 0,
-                width: "44px", height: "44px", borderRadius: "9999px",
-                background: "var(--lt-fab-bg)", border: "none",
-                cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--lt-fab-color)",
-                boxShadow: "var(--lt-shadow-fab)",
-                transition: "transform 120ms ease-out, filter 120ms ease-out",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.07)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              aria-label="新增物品"
-            >
-              <Plus size={20} strokeWidth={2.5} />
-            </button>
           </div>
         </div>
 
