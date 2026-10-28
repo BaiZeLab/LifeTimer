@@ -1216,3 +1216,36 @@ html.dark .lt-btn-ghost:not(:disabled):hover { background: oklch(35% 0.012 80); 
 }
 
 .lt-copy-btn:hover { background: var(--lt-surface-2); color: var(--lt-ink-1); }
+
+/* Header row above the steps, so it stays put when they open. */
+.lt-steps-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--lt-ink-2);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lt-steps-retry {
+  width: 100%;
+  min-height: 44px;
+  margin: 4px 0 8px;
+  border: none;
+  border-radius: 10px;
+  background: var(--lt-surface-2);
+  color: var(--lt-ink-3);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}

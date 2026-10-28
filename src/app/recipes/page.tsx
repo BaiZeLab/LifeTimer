@@ -4,12 +4,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Search, RefreshCw, Pencil, Trash2,
-  ChefHat, ListOrdered, AlertTriangle,
+  ChefHat, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RecipeFormModal } from "@/components/RecipeFormModal";
 import { RecipeIngredientList, RecipeIngredientSummary } from "@/components/RecipeIngredientList";
 import { CopyIngredientsButton } from "@/components/CopyIngredientsButton";
+import { RecipeStepList } from "@/components/RecipeStepList";
 import type { RecipeDTO, RecipeSummaryDTO } from "@/types/api";
 
 // ── DeleteConfirmModal ────────────────────────────────────────────────────────
@@ -66,15 +67,41 @@ function DeleteConfirmModal({ target, onClose, onConfirm }: {
 
 // ── RecipeCard ────────────────────────────────────────────────────────────────
 
-function RecipeCard({ recipe, expanded, onToggle, onEdit, onDelete }: {
+type DetailStatus = "loading" | "error";
+
+function RecipeCard({
+  recipe, expanded, stepsOpen, steps, stepsStatus,
+  onToggle, onToggleSteps, onRetrySteps, onEdit, onDelete,
+}: {
   recipe: RecipeSummaryDTO;
   expanded: boolean;
+  stepsOpen: boolean;
+  steps: string[] | undefined;
+  stepsStatus: DetailStatus | undefined;
   onToggle: () => void;
+  onToggleSteps: () => void;
+  onRetrySteps: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // A long card collapsing from above the fold would leave you staring at the next dish.
+  const handleToggle = () => {
+    const wasOffTop = expanded && (cardRef.current?.getBoundingClientRect().top ?? 0) < 0;
+    onToggle();
+    if (wasOffTop) {
+      requestAnimationFrame(() => cardRef.current?.scrollIntoView({ block: "start" }));
+    }
+  };
+
   return (
-    <div className="lt-card" onClick={onToggle} style={{ cursor: "pointer", gap: "12px" }}>
+    <div
+      ref={cardRef}
+      className="lt-card"
+      onClick={handleToggle}
+      style={{ cursor: "pointer", gap: "12px", scrollMarginTop: "12px" }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {recipe.category && (
@@ -127,13 +154,59 @@ function RecipeCard({ recipe, expanded, onToggle, onEdit, onDelete }: {
             </div>
           )}
 
+          <div style={{ borderTop: "1px solid var(--lt-border-muted)", marginTop: "12px" }}>
+            {recipe.stepCount === 0 ? (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: "12px", minHeight: "44px", paddingTop: "4px",
+              }}>
+                <span style={{ fontSize: "13px", color: "var(--lt-ink-4)" }}>还没有记录做法</span>
+                <button className="lt-card-action" onClick={onEdit}>补充做法</button>
+              </div>
+            ) : (
+              <button
+                className="lt-steps-toggle"
+                onClick={onToggleSteps}
+                aria-expanded={stepsOpen}
+              >
+                <span>
+                  做法
+                  <span style={{ fontWeight: 500, color: "var(--lt-ink-4)", marginLeft: "6px" }}>
+                    {recipe.stepCount} 步
+                  </span>
+                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color: "var(--lt-ink-4)", flexShrink: 0,
+                    transform: stepsOpen ? "rotate(180deg)" : "none",
+                    transition: "transform 180ms ease-out",
+                  }}
+                />
+              </button>
+            )}
+
+            {stepsOpen && recipe.stepCount > 0 && (
+              <div style={{ paddingBottom: "4px" }}>
+                {steps ? (
+                  <RecipeStepList steps={steps} />
+                ) : stepsStatus === "error" ? (
+                  <button className="lt-steps-retry" onClick={onRetrySteps}>
+                    加载失败，点此重试
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "center", padding: "16px 0", color: "var(--lt-ink-4)" }}>
+                    <RefreshCw size={16} className="lt-spin" aria-label="加载做法" />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div style={{
             display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center",
-            borderTop: "1px solid var(--lt-border-muted)", marginTop: "12px", paddingTop: "10px",
+            borderTop: "1px solid var(--lt-border-muted)", paddingTop: "10px",
           }}>
-            <Link href={`/recipes/${recipe.id}`} className="lt-card-action" style={{ textDecoration: "none" }}>
-              <ListOrdered size={13} />做法
-            </Link>
             <button className="lt-card-action" onClick={onEdit}>
               <Pencil size={13} />编辑
             </button>
@@ -157,8 +230,14 @@ export default function RecipesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<RecipeDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RecipeSummaryDTO | null>(null);
+  const [stepsOpenId, setStepsOpenId] = useState<number | null>(null);
+  // Step text is not in the list payload; fetched per dish on first open.
+  const [details, setDetails] = useState<Record<number, RecipeDTO>>({});
+  const [detailStatus, setDetailStatus] = useState<Record<number, DetailStatus>>({});
 
   const firstLoad = useRef(true);
+  const detailsRef = useRef(details);
+  detailsRef.current = details;
 
   const load = useCallback(async (q: string) => {
     if (firstLoad.current) setLoading(true);
@@ -178,18 +257,60 @@ export default function RecipesPage() {
     return () => clearTimeout(t);
   }, [query, load]);
 
-  const openEdit = useCallback(async (id: number) => {
-    const res = await fetch(`/api/recipes/${id}`);
-    if (!res.ok) return;
-    setEditTarget(await res.json());
-    setFormOpen(true);
+  const fetchDetail = useCallback(async (id: number): Promise<RecipeDTO | null> => {
+    const cached = detailsRef.current[id];
+    if (cached) return cached;
+    setDetailStatus((prev) => ({ ...prev, [id]: "loading" }));
+    try {
+      const res = await fetch(`/api/recipes/${id}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const detail: RecipeDTO = await res.json();
+      setDetails((prev) => ({ ...prev, [id]: detail }));
+      setDetailStatus((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      return detail;
+    } catch {
+      setDetailStatus((prev) => ({ ...prev, [id]: "error" }));
+      return null;
+    }
   }, []);
+
+  const toggleCard = useCallback((id: number) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+    setStepsOpenId(null);
+  }, []);
+
+  const toggleSteps = useCallback((id: number) => {
+    setStepsOpenId((prev) => (prev === id ? null : id));
+    if (stepsOpenId !== id) void fetchDetail(id);
+  }, [fetchDetail, stepsOpenId]);
+
+  const invalidateDetails = useCallback(() => {
+    setDetails({});
+    setDetailStatus({});
+  }, []);
+
+  const openEdit = useCallback(async (id: number) => {
+    const detail = await fetchDetail(id);
+    if (!detail) return;
+    setEditTarget(detail);
+    setFormOpen(true);
+  }, [fetchDetail]);
+
+  const handleSaved = useCallback(() => {
+    invalidateDetails();
+    load(query);
+  }, [invalidateDetails, load, query]);
 
   const handleDelete = useCallback(async (id: number) => {
     await fetch(`/api/recipes/${id}`, { method: "DELETE" });
     setDeleteTarget(null);
+    invalidateDetails();
     load(query);
-  }, [load, query]);
+  }, [invalidateDetails, load, query]);
 
   const searching = query.trim().length > 0;
 
@@ -279,7 +400,12 @@ export default function RecipesPage() {
                 key={r.id}
                 recipe={r}
                 expanded={expandedId === r.id}
-                onToggle={() => setExpandedId((prev) => (prev === r.id ? null : r.id))}
+                stepsOpen={stepsOpenId === r.id}
+                steps={details[r.id]?.steps}
+                stepsStatus={detailStatus[r.id]}
+                onToggle={() => toggleCard(r.id)}
+                onToggleSteps={() => toggleSteps(r.id)}
+                onRetrySteps={() => void fetchDetail(r.id)}
                 onEdit={() => openEdit(r.id)}
                 onDelete={() => setDeleteTarget(r)}
               />
@@ -300,7 +426,7 @@ export default function RecipesPage() {
         open={formOpen}
         recipe={editTarget}
         onClose={() => setFormOpen(false)}
-        onSaved={() => load(query)}
+        onSaved={handleSaved}
       />
 
       <DeleteConfirmModal
